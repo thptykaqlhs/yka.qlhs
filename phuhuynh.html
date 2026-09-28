@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sổ LLĐT YKA</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sổ LLĐT YKA">
+
+<link rel="apple-touch-icon" href="./logo-yka.jpg">
+<link rel="icon" type="image/jpeg" href="./logo-yka.jpg">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #1e3a8a; --bg: #f8fafc; --surface: #ffffff; --text: #0f172a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+  body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 1rem; min-height: 100vh; }
+  .container { max-width: 480px; width: 100%; margin-top: 1rem; }
+  
+  .header { text-align: center; margin-bottom: 2rem; }
+  .header img { 
+    width: 140px; 
+    height: auto; 
+    margin-bottom: 1rem; 
+  }
+  .header h1 { font-size: 1.4rem; color: var(--primary); font-weight: 800; margin-bottom: 0.35rem; }
+  .header p { font-size: 0.95rem; color: #64748b; }
+  
+  .card { background: var(--surface); padding: 1.5rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+  .form-group { margin-bottom: 1.25rem; }
+  label { display: block; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: #334155; text-align: center;}
+  input { width: 100%; padding: 1rem; border: 2px solid #cbd5e1; border-radius: 12px; font-size: 1.15rem; font-weight: 700; text-align: center; letter-spacing: 1px; color: var(--primary);}
+  input:focus { outline: none; border-color: var(--primary); }
+  
+  .btn { width: 100%; padding: 1rem; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; }
+  .btn:disabled { background: #94a3b8; }
+  
+  #resultBox { display: none; margin-top: 1.5rem; padding: 1.5rem; border-radius: 16px; background: #ffffff; border: 2px solid #bfdbfe; box-shadow: 0 10px 25px rgba(30,58,138,0.08); }
+  
+  .student-name-box { background: var(--primary); color: white; padding: 1rem; border-radius: 12px; text-align: center; margin-bottom: 1.5rem; box-shadow: 0 4px 6px rgba(30,58,138,0.2); }
+  .student-name-label { font-size: 0.8rem; text-transform: uppercase; opacity: 0.9; margin-bottom: 0.3rem;}
+  .student-name-val { font-size: 1.3rem; font-weight: 800; }
+
+  .result-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #cbd5e1; text-align: center; }
+  .result-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .res-label { font-size: 0.85rem; color: #64748b; font-weight: 700; text-transform: uppercase; }
+  .res-val { font-size: 1.8rem; font-weight: 800; margin-top: 0.3rem; }
+  .val-danger { color: #dc2626; }
+  .val-success { color: #16a34a; }
+  
+  /* Khung hiển thị Nghỉ có phép / Không phép */
+  .absence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; }
+  .absence-card { background: #f8fafc; padding: 0.85rem 0.5rem; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; }
+  .absence-num { font-size: 1.4rem; font-weight: 800; margin-top: 0.25rem; }
+  .num-warning { color: #d97706; }
+  .num-danger { color: #dc2626; }
+
+  .res-details { font-size: 0.95rem; line-height: 1.6; color: #1e293b; margin-top: 0.5rem; background: #f1f5f9; padding: 1rem; border-radius: 12px; text-align: left; }
+  
+  .btn-reset { margin-top: 1.5rem; background: #f1f5f9; border: none; color: #475569; font-size: 0.9rem; font-weight: 600; cursor: pointer; width: 100%; text-align: center; padding: 0.75rem; border-radius: 10px; }
+  
+  .install-hint { margin-top: 2rem; background: #fffbeb; border: 1px solid #fde68a; padding: 1rem; border-radius: 12px; font-size: 0.85rem; color: #92400e; text-align: justify; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <img src="./logo-yka.jpg" alt="Logo YKA">
+    <h1>SỔ LIÊN LẠC ĐIỆN TỬ YKA</h1>
+    <p>Tra cứu Điểm Rèn luyện & Kỷ luật</p>
+  </div>
+
+  <div class="card" id="inputCard">
+    <form id="searchForm" onsubmit="handleManualSearch(event)">
+      <div class="form-group">
+        <label>Mã định danh Bộ GD&ĐT</label>
+        <input type="text" id="studentId" placeholder="Nhập mã định danh..." required autocomplete="off" inputmode="numeric">
+      </div>
+      <button type="submit" class="btn" id="btnSubmit">Tra Cứu Kết Quả</button>
+    </form>
+  </div>
+
+  <div id="resultBox">
+    <div class="student-name-box">
+      <div class="student-name-label">Học sinh</div>
+      <div class="student-name-val" id="resName">--</div>
+    </div>
+
+    <div class="result-item">
+      <div class="res-label">Điểm rèn luyện</div>
+      <div class="res-val" id="resScore">--</div>
+    </div>
+    
+    <div class="result-item">
+      <div class="res-label">Xếp loại</div>
+      <div class="res-val" id="resRank">--</div>
+    </div>
+
+    <!-- MỤC MỚI: THỐNG KÊ NGHỈ HỌC -->
+    <div class="result-item">
+      <div class="res-label">Thống kê chuyên cần</div>
+      <div class="absence-grid">
+        <div class="absence-card">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">Nghỉ có phép</div>
+          <div class="absence-num num-warning" id="resExcused">0 buổi</div>
+        </div>
+        <div class="absence-card">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">Nghỉ không phép</div>
+          <div class="absence-num num-danger" id="resUnexcused">0 buổi</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-item">
+      <div class="res-label">Chi tiết vi phạm / Điểm cộng</div>
+      <div class="res-details" id="resDetails">--</div>
+    </div>
+    <button class="btn-reset" onclick="forgetAndSearchAgain()">Đăng xuất / Đổi học sinh</button>
+  </div>
+
+  <div class="install-hint" id="installHint">
+    <strong>💡 Mẹo cho Phụ huynh:</strong> Để không phải nhập mã vào các lần sau, ông bà/bố mẹ hãy tải ứng dụng này ra màn hình chính điện thoại bằng cách: <br><br>
+    - <strong>Dùng iPhone (Safari):</strong> Bấm biểu tượng <b>[Chia sẻ]</b> ở thanh dưới cùng 👉 Chọn <b>[Thêm vào MH chính]</b>.<br>
+    - <strong>Dùng Android (Chrome/Zalo):</strong> Bấm biểu tượng <b>[3 chấm]</b> ở góc trên phải 👉 Chọn <b>[Thêm vào Màn hình chính]</b>.
+  </div>
+</div>
+
+<script>
+const MASTER_APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzNrAzSRBSrAxA2S474ZIQX7-beJB2LvUkhKq5mo7VlqMRavbAUr6U7yiWg1DZny0WnIw/exec";
+
+async function sha256Hash(text) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const savedId = localStorage.getItem('yka_saved_moet_id');
+  if (savedId) {
+    document.getElementById('studentId').value = savedId;
+    executeSearch(savedId);
+  }
+});
+
+function handleManualSearch(e) {
+  e.preventDefault();
+  const id = document.getElementById('studentId').value.trim();
+  executeSearch(id);
+}
+
+window.processParentData = function(result) {
+  const btn = document.getElementById('btnSubmit');
+  const resultBox = document.getElementById('resultBox');
+  const inputCard = document.getElementById('inputCard');
+  const hint = document.getElementById('installHint');
+  
+  btn.innerHTML = "Tra Cứu Kết Quả";
+  btn.disabled = false;
+
+  const oldScript = document.getElementById('yka-jsonp');
+  if (oldScript) oldScript.remove();
+
+  if (result.status === "error") {
+    alert("Lỗi: " + result.message);
+    return;
+  }
+  
+  if (result.status === "not_found") {
+    alert("❌ Mã Học Sinh không chính xác hoặc chưa có dữ liệu trong tuần này.");
+    inputCard.style.display = 'block';
+    resultBox.style.display = 'none';
+    if(hint) hint.style.display = 'block';
+    return;
+  }
+
+  if (result.status === "success" && result.data) {
+      const id = document.getElementById('studentId').value.trim();
+      localStorage.setItem('yka_saved_moet_id', id);
+      
+      const cols = result.data;
+      let studentName, score, rank, rawDetails, excused = 0, unexcused = 0;
+
+      if (cols.length >= 7) {
+          // Cấu trúc 7 cột mới nhất
+          studentName = cols[1];
+          score = cols[2];
+          rank = cols[3];
+          rawDetails = String(cols[4]).trim();
+          excused = cols[5] || 0;
+          unexcused = cols[6] || 0;
+      } else if (cols.length >= 5) {
+          // Cấu trúc 5 cột
+          studentName = cols[1];
+          score = cols[2];
+          rank = cols[3];
+          rawDetails = String(cols[4]).trim();
+      } else {
+          // Cấu trúc 4 cột cũ
+          studentName = "Đang cập nhật...";
+          score = cols[1];
+          rank = cols[2];
+          rawDetails = String(cols[3]).trim();
+      }
+
+      document.getElementById('resName').textContent = studentName || "Không xác định";
+      document.getElementById('resScore').textContent = score + " điểm";
+      
+      const rankEl = document.getElementById('resRank');
+      rankEl.textContent = rank;
+      rankEl.className = (rank === 'Chưa đạt' || rank === 'Yếu' || rank === 'Không đạt') ? 'res-val val-danger' : 'res-val val-success';
+      
+      document.getElementById('resExcused').textContent = excused + " buổi";
+      document.getElementById('resUnexcused').textContent = unexcused + " buổi";
+
+      document.getElementById('resDetails').innerHTML = rawDetails.split('|').join('<br>• ');
+      
+      resultBox.style.display = 'block';
+      inputCard.style.display = 'none'; 
+      if(hint) hint.style.display = 'none';
+  }
+};
+
+async function executeSearch(id) {
+  const btn = document.getElementById('btnSubmit');
+  btn.innerHTML = "⏳ Đang truy xuất dữ liệu...";
+  btn.disabled = true;
+
+  try {
+    const rawInput = String(id).trim().toLowerCase().replace(/\s/g, '');
+    const userHash = await sha256Hash(rawInput);
+
+    const script = document.createElement('script');
+    script.id = 'yka-jsonp';
+    script.src = MASTER_APP_SCRIPT_URL + "?action=search_phuhuynh&hash=" + userHash + "&callback=processParentData";
+    
+    script.onerror = function() {
+      alert("⚠️ Lỗi kết nối mạng. Không thể liên lạc với máy chủ.");
+      btn.innerHTML = "Tra Cứu Kết Quả";
+      btn.disabled = false;
+    };
+
+    document.body.appendChild(script);
+
+  } catch (error) {
+    alert("⚠️ Lỗi thiết bị: " + error.message);
+    btn.innerHTML = "Tra Cứu Kết Quả";
+    btn.disabled = false;
+  }
+}
+
+function forgetAndSearchAgain() {
+  localStorage.removeItem('yka_saved_moet_id');
+  document.getElementById('inputCard').style.display = 'block';
+  document.getElementById('installHint').style.display = 'block';
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('studentId').value = '';
+}
+</script>
+</body>
+</html>
