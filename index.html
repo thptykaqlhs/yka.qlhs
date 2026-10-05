@@ -4418,10 +4418,23 @@ function setupSdbForm() {
   document.getElementById('sdbClassDisplay').value = `Chi đoàn ${targetClass}`;
   document.getElementById('sdbUserDisplay').value = loggedUser.name;
 
-  const data = sdbFullData[targetClass] || {
-    total: 30, good: 28, fair: 2, medium: 0, weak: 0, poor: 0,
-    absences: [], goodScores: 15, fairScores: 25, medScores: 8, poorScores: 1
+  let data = sdbFullData[targetClass] || {
+    total: 30, good: 30, fair: 0, medium: 0, weak: 0, poor: 0,
+    absences: [], goodScores: 0, fairScores: 0, medScores: 0, poorScores: 0
   };
+
+  // Đọc xem Tuần đang chọn đã bị chốt sổ chưa
+  const weekSel = document.getElementById('inputWeekSelect_sdb');
+  const isFinalized = (weekSel && weekSel.selectedOptions[0]) ? (weekSel.selectedOptions[0].dataset.finalized === 'true') : false;
+  
+  // NẾU ĐÃ CHỐT: Moi dữ liệu từ kho lịch sử (sdbSnapshot) ra để hiển thị
+  if (isFinalized) {
+    const weekNum = parseInt(weekSel.value);
+    const historyRecord = weeklyHistory.find(h => (!h.type || h.type === 'WEEK') && h.weekNumber === weekNum);
+    if (historyRecord && historyRecord.sdbSnapshot && historyRecord.sdbSnapshot[targetClass]) {
+      data = { ...data, ...historyRecord.sdbSnapshot[targetClass] };
+    }
+  }
 
   document.getElementById('sdbTotalInput').value = data.total;
   document.getElementById('sdbGoodInput').value = data.good;
@@ -4440,7 +4453,19 @@ function setupSdbForm() {
   document.getElementById('sdbCountFairScores').value = data.fairScores || 0;
   document.getElementById('sdbCountMedScores').value = data.medScores || 0;
   document.getElementById('sdbCountPoorScores').value = data.poorScores || 0;
-    updateStudentDatalist(targetClass);
+   // Khóa Form nếu là tuần đã chốt (Chỉ cho xem, không cho sửa)
+  const inputsToLock = ['sdbTotalInput', 'sdbGoodInput', 'sdbFairInput', 'sdbMedInput', 'sdbWeakInput', 'sdbPoorInput', 'sdbCountGoodScores', 'sdbCountGvcnScores', 'sdbCountFairScores', 'sdbCountMedScores', 'sdbCountPoorScores', 'sdbAbsenceDate', 'sdbAbsenceStudentName', 'sdbAbsenceType', 'sdbAbsenceReason'];
+  inputsToLock.forEach(id => {
+     const el = document.getElementById(id);
+     if (el) el.disabled = isFinalized;
+  });
+  
+  const btnAdd = document.querySelector('button[onclick="addSdbAbsenceItem()"]');
+  if (btnAdd) btnAdd.style.display = isFinalized ? 'none' : 'inline-flex';
+  
+  const btnSave = document.getElementById('btnSaveSdbData');
+  if (btnSave) btnSave.style.display = isFinalized ? 'none' : 'block';
+  updateStudentDatalist(targetClass);
   renderSdbAbsenceList();
   recalcSdbFull();
 }
@@ -4451,9 +4476,16 @@ function renderSdbAbsenceList() {
   const tbody = document.getElementById('sdbAbsenceListBody');
   tbody.innerHTML = '';
 
-  // Chỉ lấy các lượt nghỉ của tuần hiện tại (chưa bị chốt)
-  const activeAbsences = (data.absences || []).map((item, originalIdx) => ({ ...item, originalIdx })).filter(item => !item.isArchived);
+  const weekSel = document.getElementById('inputWeekSelect_sdb');
+  const isFinalized = (weekSel && weekSel.selectedOptions[0]) ? (weekSel.selectedOptions[0].dataset.finalized === 'true') : false;
+  const fromD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.from : null;
+  const toD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.to : null;
 
+  // Lọc lấy chính xác lượt nghỉ trong khoảng ngày của tuần đang chọn
+  const activeAbsences = (data.absences || []).map((item, originalIdx) => ({ ...item, originalIdx })).filter(item => {
+    if (fromD && toD) return item.date >= fromD && item.date <= toD;
+    return !item.isArchived;
+  });
   if (activeAbsences.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:1rem; color:var(--text-muted);">Chi đoàn chưa có học sinh nào nghỉ học trong tuần này.</td></tr>`;
     return;
@@ -4468,7 +4500,7 @@ function renderSdbAbsenceList() {
       <td style="text-align:center; font-weight:bold; color:var(--danger);">${item.point} đ</td>
       <td style="font-size:0.8rem;">${item.reason || '--'}</td>
       <td style="text-align:center;">
-        <button type="button" class="btn btn-outline btn-sm" onclick="removeSdbAbsenceItem(${item.originalIdx})" style="color:var(--danger);">✕</button>
+        ${isFinalized ? '<span style="color:var(--text-muted); font-size:0.75rem;">Đã chốt</span>' : `<button type="button" class="btn btn-outline btn-sm" onclick="removeSdbAbsenceItem(${item.originalIdx})" style="color:var(--danger);">✕</button>`}
       </td>
     `;
     tbody.appendChild(tr);
@@ -4536,7 +4568,14 @@ function recalcSdbFull() {
 
       const data = sdbFullData[targetClass] || { absences: [] };
       let absencePenalty = 0;
-      (data.absences || []).filter(a => !a.isArchived).forEach(a => absencePenalty += Math.abs(a.point));
+      const weekSel = document.getElementById('inputWeekSelect_sdb');
+      const fromD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.from : null;
+      const toD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.to : null;
+
+      (data.absences || []).filter(a => {
+        if (fromD && toD) return a.date >= fromD && a.date <= toD;
+        return !a.isArchived;
+      }).forEach(a => absencePenalty += Math.abs(a.point));
 
       const cfg = (typeof CONDUCT_CONFIG !== 'undefined') ? CONDUCT_CONFIG : {};
       const goodPt = cfg.scoreGoodBonus !== undefined ? cfg.scoreGoodBonus : 1;
@@ -8797,7 +8836,7 @@ function onInputWeekChange(type) {
   } else if (type === 'sdb') {
     const dInp = document.getElementById('sdbAbsenceDate');
     if(dInp) dInp.value = fromDate;
-    if(typeof renderSdbAbsenceList === 'function') renderSdbAbsenceList();
+    if(typeof setupSdbForm === 'function') setupSdbForm(); // Gọi lại toàn bộ form để nạp số liệu cũ
   }
 }
 
