@@ -2742,22 +2742,25 @@ function connectMqtt() {
             }
           }
         }
-        else if (payload.action === 'UPDATE_ALL_USERS') {
-          if (Array.isArray(payload.data) && payload.data.length > 1) {
-            systemUsers = payload.data;
+        else if (payload.action === 'UPDATE_CODO_SCOPE') {
+          const targetUser = systemUsers.find(u => u.username.toLowerCase() === payload.data.username.toLowerCase());
+          if (targetUser) {
+            targetUser.scope = payload.data.scope;
+            targetUser.codoLocked = payload.data.codoLocked;
             localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-            // Nếu đang là Cờ đỏ và được Admin mở khóa từ xa -> Mở lại ô chọn lớp ngay lập tức
-            if (loggedUser && loggedUser.role === 'codo') {
-              const myUpdated = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
-              if (myUpdated) {
-                loggedUser.scope = myUpdated.scope;
-                loggedUser.codoLocked = myUpdated.codoLocked;
-                sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
-                setupCodoForm();
-              }
+            
+            // Nếu người nhận đang là Cờ đỏ và đúng là tài khoản bị thay đổi -> Mở/Khóa giao diện ngay lập tức
+            if (loggedUser && loggedUser.role === 'codo' && loggedUser.username.toLowerCase() === payload.data.username.toLowerCase()) {
+              loggedUser.scope = payload.data.scope;
+              loggedUser.codoLocked = payload.data.codoLocked;
+              sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
+              setupCodoForm();
             }
-            if (loggedUser && loggedUser.role === 'admin' && typeof renderAdminUsersTable === 'function') {
-              renderAdminUsersTable();
+            
+            // Nếu Admin đang mở tab Phân công thì tự động vẽ lại bảng
+            if (loggedUser && loggedUser.role === 'admin') {
+              if (typeof renderCodoRotationTable === 'function') renderCodoRotationTable();
+              if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
             }
           }
         }
@@ -4938,7 +4941,7 @@ async function confirmAndLockMyCodoClass() {
   lastCloudFetchTime = Date.now();
   localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
   await updateSingleCodoScopeOnCloud(loggedUser.username, [chosenClass], true);
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
+  publishUpdate('UPDATE_CODO_SCOPE', { username: loggedUser.username, scope: [chosenClass], codoLocked: true });
 
   setupUserSessionUI();
   alert(`✅ Đã chốt và khóa phân công thành công: Chi đoàn ${chosenClass}!`);
@@ -6482,8 +6485,9 @@ async function toggleSingleCodoLock(idx) {
   if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable(); // Cập nhật ngầm bảng bên Tab kia
 
   // Lưu lẻ trạng thái lên Google Drive và bắn MQTT cho máy Cờ đỏ đó mở khóa ngay lập tức
+ // Lưu lẻ trạng thái lên Google Drive và bắn MQTT cho máy Cờ đỏ đó mở khóa ngay lập tức
   updateSingleCodoScopeOnCloud(u.username, u.scope, u.codoLocked);
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
+  publishUpdate('UPDATE_CODO_SCOPE', { username: u.username, scope: u.scope, codoLocked: u.codoLocked });
 }
 
 // Hàm gửi lẻ phân công của 1 Cờ đỏ lên Cloud (Tránh việc 2 Cờ đỏ cùng chốt lớp 1 lúc bị đè nhau)
