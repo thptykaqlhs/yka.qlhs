@@ -547,7 +547,11 @@
         <span class="badge badge-success" id="sdbClassAssignedBadge">Lớp phụ trách: Chưa rõ</span>
       </div>
       <div class="card-body">
-
+        <!-- THÊM Ô CHỌN TUẦN CHO SĐB -->
+        <div class="sub-box" style="background:#eff6ff; border-color:#bfdbfe; margin-bottom:1.25rem;">
+          <label style="font-weight:700; color:var(--primary);">📅 Chọn Tuần nhập liệu / Sửa lỗi (SĐB):</label>
+          <select id="inputWeekSelect_sdb" onchange="onInputWeekChange('sdb')" style="width:100%; margin-top:0.4rem; padding:0.5rem; border-radius:6px; border:1px solid var(--primary-light); font-weight:bold; color:var(--primary);"></select>
+        </div>
         <!-- MỤC 1: XẾP LOẠI TIẾT HỌC TRONG TUẦN -->
         <div class="sub-box">
           <div class="sub-box-title">
@@ -715,6 +719,11 @@
       <div class="card-body">
         <form id="codoForm" onsubmit="handleCodoViolationSubmit(event)">
           <div class="form-grid">
+            <!-- THÊM Ô CHỌN TUẦN CHO CỜ ĐỎ -->
+            <div class="form-group full-width" style="background:#eff6ff; padding:0.6rem 0.8rem; border-radius:8px; border:1px solid #bfdbfe;">
+              <label style="color:var(--primary);">📅 Chọn Tuần nhập liệu / Sửa lỗi:</label>
+              <select id="inputWeekSelect_codo" onchange="onInputWeekChange('codo')" style="width:100%; margin-top:0.3rem; padding:0.4rem; border-radius:6px; border:1px solid var(--primary-light); font-weight:bold; color:var(--primary);"></select>
+            </div>
             <div class="form-group">
               <label>Cán bộ Cờ đỏ ghi nhận:</label>
               <input type="text" id="codoRecorderInput" class="locked-input" readonly>
@@ -826,6 +835,11 @@
       <div class="card-body">
         <form id="tnxkForm" onsubmit="handleTnxkViolationSubmit(event)">
           <div class="form-grid">
+            <!-- THÊM Ô CHỌN TUẦN CHO TNXK -->
+            <div class="form-group full-width" style="background:#eff6ff; padding:0.6rem 0.8rem; border-radius:8px; border:1px solid #bfdbfe;">
+              <label style="color:var(--primary);">📅 Chọn Tuần nhập liệu / Sửa lỗi:</label>
+              <select id="inputWeekSelect_tnxk" onchange="onInputWeekChange('tnxk')" style="width:100%; margin-top:0.3rem; padding:0.4rem; border-radius:6px; border:1px solid var(--primary-light); font-weight:bold; color:var(--primary);"></select>
+            </div>
             <div class="form-group">
               <label>Tổ trưởng TNXK ghi nhận:</label>
               <input type="text" id="tnxkRecorderInput" class="locked-input" readonly>
@@ -3245,6 +3259,7 @@ function setupUserSessionUI() {
   } else {
     switchTab(myTabs[0]); 
   }
+  initInputWeekSelects();
 }
 
 
@@ -5699,15 +5714,22 @@ function renderCodoLogsTable() {
   const tbody = document.getElementById('codoLogsBody');
   tbody.innerHTML = '';
 
+  const weekSel = document.getElementById('inputWeekSelect_codo');
+  const fromD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.from : null;
+  const toD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.to : null;
+
   const list = violations
-    .filter(v =>
-      loggedUser &&
+    .filter(v => {
+      // THÊM DÒNG NÀY: Lọc theo tuần đang chọn
+      if (fromD && toD && (v.date < fromD || v.date > toD)) return false; 
+      
+      return loggedUser &&
       (
         loggedUser.role === 'admin' ||
         loggedUser.scope.includes(v.classId)
       ) &&
-      !v.recorder.includes('TNXK')
-    )
+      !v.recorder.includes('TNXK');
+    })
     .reverse();
 
   if (list.length === 0) {
@@ -5841,15 +5863,22 @@ function renderTnxkLogsTable() {
   const tbody = document.getElementById('tnxkLogsBody');
   tbody.innerHTML = '';
 
+  const weekSel = document.getElementById('inputWeekSelect_tnxk');
+  const fromD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.from : null;
+  const toD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.to : null;
+
   const list = violations
-    .filter(v =>
-      loggedUser &&
+    .filter(v => {
+      // THÊM DÒNG NÀY: Lọc theo tuần đang chọn
+      if (fromD && toD && (v.date < fromD || v.date > toD)) return false; 
+
+      return loggedUser &&
       (
         loggedUser.role === 'admin' ||
         loggedUser.scope.includes(v.classId)
       ) &&
-      v.recorder.includes('TNXK')
-    )
+      v.recorder.includes('TNXK');
+    })
     .reverse();
 
   if (list.length === 0) {
@@ -8705,7 +8734,73 @@ async function forceMobileRefresh() {
     }
   }
 }
-// --- KẾT THÚC ---
+// HÀM 1: Nạp danh sách 35 Tuần vào 3 ô Chọn Tuần vừa tạo
+function initInputWeekSelects() {
+  const selects = ['inputWeekSelect_sdb', 'inputWeekSelect_codo', 'inputWeekSelect_tnxk'];
+  const startStr = (typeof getWeek1StartDate === 'function') ? getWeek1StartDate() : (localStorage.getItem('yka_week1_start') || '2026-09-07');
+  const baseDate = new Date(startStr + 'T00:00:00');
+  if (isNaN(baseDate.getTime())) return;
+
+  let optionsHtml = '';
+  const todayStr = new Date().toISOString().split('T')[0];
+  let activeWeek = 1;
+
+  for (let w = 1; w <= 35; w++) {
+    const dFrom = new Date(baseDate);
+    dFrom.setDate(baseDate.getDate() + (w - 1) * 7);
+    const dTo = new Date(dFrom);
+    dTo.setDate(dFrom.getDate() + 6);
+
+    const fromYMD = dFrom.toISOString().split('T')[0];
+    const toYMD = dTo.toISOString().split('T')[0];
+    const fmtFrom = `${fromYMD.split('-')[2]}/${fromYMD.split('-')[1]}/${fromYMD.split('-')[0]}`;
+    const fmtTo = `${toYMD.split('-')[2]}/${toYMD.split('-')[1]}/${toYMD.split('-')[0]}`;
+
+    // Kiểm tra tuần này Admin đã bấm chốt chưa
+    const isFinalized = weeklyHistory.some(h => (!h.type || h.type === 'WEEK') && (h.weekNumber === w || (h.week && h.week.includes(`Tuần ${w}`))));
+    if (todayStr >= fromYMD && todayStr <= toYMD) activeWeek = w;
+
+    optionsHtml += `<option value="${w}" data-from="${fromYMD}" data-to="${toYMD}" data-finalized="${isFinalized}">📅 Tuần ${w} (${fmtFrom} - ${fmtTo}) ${isFinalized ? '✅ [Đã chốt]' : ''}</option>`;
+  }
+
+  selects.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const currentVal = el.value;
+      el.innerHTML = optionsHtml;
+      el.value = currentVal || activeWeek;
+    }
+  });
+}
+
+// HÀM 2: Xử lý khi người dùng chọn một tuần bất kỳ
+function onInputWeekChange(type) {
+  const sel = document.getElementById(`inputWeekSelect_${type}`);
+  if (!sel || !sel.selectedOptions[0]) return;
+  const opt = sel.selectedOptions[0];
+  const isFinalized = opt.dataset.finalized === 'true';
+  const fromDate = opt.dataset.from;
+
+  if (isFinalized) {
+    alert(`⚠️ TUẦN NÀY ĐÃ ĐƯỢC ADMIN CHỐT SỔ!\n\nĐể sửa dữ liệu của tuần này, bạn hãy nhờ Admin vào tab [Lịch Sử] bấm [Hoàn tác] tuần này ra trước. Nếu cố tình nhập, dữ liệu sẽ bị lệch!`);
+  }
+
+  // Tự động nhảy ngày ghi nhận về Thứ 2 của tuần được chọn
+  if (type === 'codo') {
+    const dInp = document.getElementById('codoDateInput');
+    if(dInp) dInp.value = fromDate;
+    if(typeof renderCodoLogsTable === 'function') renderCodoLogsTable();
+  } else if (type === 'tnxk') {
+    const dInp = document.getElementById('tnxkDateInput');
+    if(dInp) dInp.value = fromDate;
+    if(typeof renderTnxkLogsTable === 'function') renderTnxkLogsTable();
+  } else if (type === 'sdb') {
+    const dInp = document.getElementById('sdbAbsenceDate');
+    if(dInp) dInp.value = fromDate;
+    if(typeof renderSdbAbsenceList === 'function') renderSdbAbsenceList();
+  }
+}
+
 </script>
 <datalist id="studentDatalist"></datalist>
 </body>
