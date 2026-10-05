@@ -2247,8 +2247,9 @@ async function fetchDatabaseFromCloud(force = false) {
           }
         }
 
-        if (loggedUser && loggedUser.role === 'admin' && typeof renderAdminUsersTable === 'function') {
-          renderAdminUsersTable();
+        if (loggedUser && loggedUser.role === 'admin') {
+          if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
+          if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
         }
       }
     }
@@ -2853,8 +2854,9 @@ function connectMqtt() {
                 setupCodoForm();
               }
             }
-            if (loggedUser && loggedUser.role === 'admin' && typeof renderAdminUsersTable === 'function') {
-              renderAdminUsersTable();
+            if (loggedUser && loggedUser.role === 'admin') {
+              if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
+              if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
             }
           }
         }
