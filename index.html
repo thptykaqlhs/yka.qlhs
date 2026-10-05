@@ -2770,22 +2770,21 @@ function connectMqtt() {
             systemUsers = payload.data;
             localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
             
-            // QUAN TRỌNG NHẤT: Nếu người đang mở máy là Cờ đỏ -> Tự động nạp lại giao diện mở khóa/khóa
+            // 1. Dành cho Học sinh (Cờ đỏ): Mở khóa giao diện ngay lập tức
             if (loggedUser && loggedUser.role === 'codo') {
               const myUpdated = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
               if (myUpdated) {
                 loggedUser.scope = myUpdated.scope;
                 loggedUser.codoLocked = myUpdated.codoLocked;
                 sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
-                
-                // Lệnh làm tươi lại form chọn lớp của học sinh ngay lập tức
-                if (typeof setupCodoForm === 'function') setupCodoForm();
+                if (typeof setupCodoForm === 'function') setupCodoForm(); 
               }
             }
             
-            // Cập nhật lại bảng cho Admin nếu Admin đang mở tab Quản lý tài khoản
-            if (loggedUser && loggedUser.role === 'admin' && typeof renderAdminUsersTable === 'function') {
-              renderAdminUsersTable();
+            // 2. Dành cho Admin: Bắt buộc vẽ lại TẤT CẢ các bảng để không bị kẹt hiển thị
+            if (loggedUser && loggedUser.role === 'admin') {
+              if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
+              if (typeof renderCodoRotationTable === 'function') renderCodoRotationTable(); // Lệnh quan trọng chống kẹt
             }
           }
         }
