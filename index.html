@@ -4951,6 +4951,7 @@ const CODO_RING_36 = [];
 });
 
 // Mở khóa đồng loạt cho 36 Cờ đỏ tự chọn lớp
+// Mở khóa đồng loạt cho 36 Cờ đỏ tự chọn lớp
 function renderCodoRotationTable() {
   const tbody = document.getElementById('codoRotationTableBody');
   if (!tbody) return;
@@ -4967,9 +4968,10 @@ function renderCodoRotationTable() {
       : `<button type="button" class="btn btn-sm" onclick="toggleSingleCodoLock(${realIdx})" style="background:#fffbeb; color:#b45309; border:1px solid #fcd34d; font-weight:700; width:98px;">🔓 Mở chọn</button>`;
 
     const tr = document.createElement('tr');
+    // TRẢ VỀ ĐÚNG 3 CỘT (TD) Khớp với 3 cột tiêu đề
     tr.innerHTML = `
       <td><strong>${u.username}</strong> (${u.name})</td>
-      <td><input type="text" value="${u.scope ? u.scope.join(', ') : ''}" style="width:120px; font-weight:700; color:var(--primary); padding:0.25rem 0.5rem;" onchange="systemUsers[${realIdx}].scope = this.value.trim().toUpperCase().split(',').map(s=>s.trim()).filter(Boolean);"></td>
+      <td><input type="text" id="codo_rot_scope_${realIdx}" value="${u.scope ? u.scope.join(', ') : ''}" style="width:120px; font-weight:700; color:var(--primary); padding:0.25rem 0.5rem;" onchange="systemUsers[${realIdx}].scope = this.value.trim().toUpperCase().split(',').map(s=>s.trim()).filter(Boolean);"></td>
       <td style="text-align:center;">${codoLockBtnHtml}</td>
     `;
     tbody.appendChild(tr);
@@ -6449,12 +6451,13 @@ function renderAdminUsersTable() {
 }
 
 // Hàm bật/tắt Khóa hoặc Mở khóa tức thì cho từng Cờ đỏ riêng lẻ (Khi Cờ đỏ bấm nhầm nhờ Admin mở)
+// Hàm bật/tắt Khóa hoặc Mở khóa tức thì cho từng Cờ đỏ riêng lẻ
 async function toggleSingleCodoLock(idx) {
   const u = systemUsers[idx];
   if (!u || u.role !== 'codo') return;
 
-  // Cập nhật luôn tên lớp nếu Admin vừa gõ sửa trong ô bên cạnh
-  const sEl = document.getElementById(`usr_scope_${idx}`);
+  // Lấy đúng ID ô text ở Tab Phân Công (Vừa thêm ở Bước 1)
+  const sEl = document.getElementById(`codo_rot_scope_${idx}`);
   if (sEl && sEl.value.trim()) {
     u.scope = sEl.value.trim().toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
   }
@@ -6473,7 +6476,10 @@ async function toggleSingleCodoLock(idx) {
 
   lastCloudFetchTime = Date.now() + 30000;
   localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-  renderAdminUsersTable();
+  
+  // VẼ LẠI BẢNG PHÂN CÔNG ĐỂ NÚT ĐỔI MÀU (Lỗi cũ gọi renderAdminUsersTable() nên bảng này không đổi)
+  renderCodoRotationTable();
+  if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable(); // Cập nhật ngầm bảng bên Tab kia
 
   // Lưu lẻ trạng thái lên Google Drive và bắn MQTT cho máy Cờ đỏ đó mở khóa ngay lập tức
   updateSingleCodoScopeOnCloud(u.username, u.scope, u.codoLocked);
