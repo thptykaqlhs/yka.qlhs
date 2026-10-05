@@ -2764,6 +2764,31 @@ function connectMqtt() {
             }
           }
         }
+        // BỔ SUNG ĐOẠN CODE BỊ MẤT NÀY VÀO DƯỚI KHỐI 'UPDATE_CODO_SCOPE' HOẶC 'UPDATE_USER_PASS'
+        else if (payload.action === 'UPDATE_ALL_USERS') {
+          if (Array.isArray(payload.data) && payload.data.length > 1) {
+            systemUsers = payload.data;
+            localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+            
+            // QUAN TRỌNG NHẤT: Nếu người đang mở máy là Cờ đỏ -> Tự động nạp lại giao diện mở khóa/khóa
+            if (loggedUser && loggedUser.role === 'codo') {
+              const myUpdated = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
+              if (myUpdated) {
+                loggedUser.scope = myUpdated.scope;
+                loggedUser.codoLocked = myUpdated.codoLocked;
+                sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
+                
+                // Lệnh làm tươi lại form chọn lớp của học sinh ngay lập tức
+                if (typeof setupCodoForm === 'function') setupCodoForm();
+              }
+            }
+            
+            // Cập nhật lại bảng cho Admin nếu Admin đang mở tab Quản lý tài khoản
+            if (loggedUser && loggedUser.role === 'admin' && typeof renderAdminUsersTable === 'function') {
+              renderAdminUsersTable();
+            }
+          }
+        }
         else if (payload.action === 'UPDATE_TABS_CONFIG') {
           if (payload.data) {
             TABS_CONFIG = payload.data;
