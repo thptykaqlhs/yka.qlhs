@@ -2123,7 +2123,7 @@ async function fetchDatabaseFromCloud(force = false) {
     // CƠ CHẾ CHỐNG GHI ĐÈ NGƯỢC (Chống Google Drive tải file cũ về đè lên file mới)
     // =====================================================================
     const lastAdminSave = parseInt(localStorage.getItem('yka_last_admin_save') || '0', 10);
-    const isDriveStale = (Date.now() - lastAdminSave < 120000); // 120000ms = 2 phút
+    const isDriveStale = (Date.now() - lastAdminSave < 9000000); // 120000ms = 2 phút
 
     if (!isDriveStale) {
       if (db.rules && db.rules.length > 0) {
@@ -2749,6 +2749,9 @@ function connectMqtt() {
             targetUser.codoLocked = payload.data.codoLocked;
             localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
             
+            // KÍCH HOẠT KHIÊN 15 PHÚT TRÊN ĐIỆN THOẠI HỌC SINH
+            localStorage.setItem('yka_last_admin_save', Date.now()); 
+            
             // Nếu người nhận đang là Cờ đỏ và đúng là tài khoản bị thay đổi -> Mở/Khóa giao diện ngay lập tức
             if (loggedUser && loggedUser.role === 'codo' && loggedUser.username.toLowerCase() === payload.data.username.toLowerCase()) {
               loggedUser.scope = payload.data.scope;
@@ -2770,6 +2773,9 @@ function connectMqtt() {
             systemUsers = payload.data;
             localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
             
+            // KÍCH HOẠT KHIÊN 15 PHÚT TRÊN ĐIỆN THOẠI HỌC SINH
+            localStorage.setItem('yka_last_admin_save', Date.now()); 
+            
             // 1. Dành cho Học sinh (Cờ đỏ): Mở khóa giao diện ngay lập tức
             if (loggedUser && loggedUser.role === 'codo') {
               const myUpdated = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
@@ -2784,7 +2790,7 @@ function connectMqtt() {
             // 2. Dành cho Admin: Bắt buộc vẽ lại TẤT CẢ các bảng để không bị kẹt hiển thị
             if (loggedUser && loggedUser.role === 'admin') {
               if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
-              if (typeof renderCodoRotationTable === 'function') renderCodoRotationTable(); // Lệnh quan trọng chống kẹt
+              if (typeof renderCodoRotationTable === 'function') renderCodoRotationTable(); 
             }
           }
         }
