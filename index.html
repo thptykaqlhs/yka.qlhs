@@ -2860,6 +2860,20 @@ function connectMqtt() {
             }
           }
         }
+        else if (payload.action === 'UPDATE_CODO_SCOPE') {
+          const targetUser = systemUsers.find(u => u.username.toLowerCase() === payload.data.username.toLowerCase());
+          if (targetUser) {
+            targetUser.scope = payload.data.scope;
+            targetUser.codoLocked = payload.data.codoLocked;
+            localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+            
+            // Cập nhật giao diện nếu là Admin
+            if (loggedUser && loggedUser.role === 'admin') {
+              if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
+              if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
+            }
+          }
+        }
         else if (payload.action === 'UPDATE_TABS_CONFIG') {
           if (payload.data) {
             TABS_CONFIG = payload.data;
@@ -5035,7 +5049,12 @@ async function confirmAndLockMyCodoClass() {
   lastCloudFetchTime = Date.now();
   localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
   await updateSingleCodoScopeOnCloud(loggedUser.username, [chosenClass], true);
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
+  // CHỈ GỬI ĐÚNG TÀI KHOẢN VỪA CHỐT LỚP
+  publishUpdate('UPDATE_CODO_SCOPE', {
+  username: loggedUser.username,
+  scope: [chosenClass],
+  codoLocked: true
+});
 
   setupUserSessionUI();
   alert(`✅ Đã chốt và khóa phân công thành công: Chi đoàn ${chosenClass}!`);
@@ -6612,7 +6631,11 @@ async function toggleSingleCodoLock(idx) {
 
   // Lưu lẻ trạng thái lên Google Drive và bắn MQTT
   updateSingleCodoScopeOnCloud(u.username, u.scope, u.codoLocked);
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
+  publishUpdate('UPDATE_CODO_SCOPE', {
+  username: u.username,
+  scope: u.scope,
+  codoLocked: u.codoLocked
+});
 }
 
 // Hàm gửi lẻ phân công của 1 Cờ đỏ lên Cloud (Tránh việc 2 Cờ đỏ cùng chốt lớp 1 lúc bị đè nhau)
