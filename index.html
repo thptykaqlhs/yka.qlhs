@@ -4901,7 +4901,6 @@ function setupCodoForm() {
     CLASSES.forEach(c => {
       classSel.innerHTML += `<option value="${c.id}">Chi đoàn ${c.id}</option>`;
     });
-    classSel.disabled = false;
     if (btnLock) btnLock.style.display = 'none';
     if (noticeEl) noticeEl.innerHTML = `<span style="color:var(--success); font-weight:600;">👑 Quyền Admin: Được phép chọn tất cả 36 chi đoàn.</span>`;
     document.getElementById('codoAssignedScopeBadge').textContent = `Phạm vi: Toàn trường (36 lớp)`;
@@ -4911,7 +4910,7 @@ function setupCodoForm() {
       classSel.innerHTML += `<option value="${c.id}" ${selectedAttr}>Chi đoàn ${c.id}</option>`;
     });
     classSel.disabled = false;
-    if (btnLock) btnLock.style.display = 'none';
+    if (btnLock) btnLock.style.display = 'inline-flex';
     if (noticeEl) {
       noticeEl.innerHTML = `<strong style="color:var(--warning);">🔓 Đang mở chọn lớp:</strong> Hãy chọn đúng lớp bạn được phân công chấm tuần này rồi bấm nút <strong>"📌 Chốt lớp chấm"</strong> để khóa lại!`;
     }
