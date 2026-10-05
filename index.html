@@ -4986,6 +4986,10 @@ function saveCodoRotationToStorage() {
   const oldText = btn ? btn.innerHTML : "💾 Lưu Chốt Phân Công";
   if (btn) { btn.innerHTML = "⏳ Đang đồng bộ..."; btn.disabled = true; }
 
+  // THÊM 2 DÒNG NÀY: Khóa không cho hệ thống tải file cũ từ Drive về đè lên trong vòng 60 giây
+  lastCloudFetchTime = Date.now() + 60000;
+  isFetchingCloud = false;
+
   updateUsersLocalAndCloud();
   publishUpdate('UPDATE_ALL_USERS', systemUsers);
   
@@ -4999,6 +5003,10 @@ function saveCodoRotationToStorage() {
 }
 
 async function adminUnlockAllCodoSelection() {
+  // THÊM 2 DÒNG BẢO VỆ
+  lastCloudFetchTime = Date.now() + 60000;
+  isFetchingCloud = false;
+
   systemUsers.forEach(u => { if (u.role === 'codo') u.codoLocked = false; });
   document.getElementById('codoRotationNoticeLog').innerHTML = `<strong style="color:#b45309; background:#fffbeb; padding:0.45rem 0.85rem; border-radius:6px; border:1px solid #fde68a; display:inline-block;">🔓 ĐÃ MỞ KHÓA ĐỒNG LOẠT: 36 Cờ đỏ hiện có thể tự chọn lớp trên điện thoại!</strong>`;
   renderCodoRotationTable();
@@ -5007,6 +5015,10 @@ async function adminUnlockAllCodoSelection() {
 }
 
 async function adminStepCodoCircle(stepDelta) {
+  // THÊM 2 DÒNG BẢO VỆ
+  lastCloudFetchTime = Date.now() + 60000;
+  isFetchingCloud = false;
+
   const total = CODO_RING_36.length; let preview = [];
   systemUsers.forEach(u => {
     if (u.role !== 'codo') return;
@@ -5028,6 +5040,10 @@ async function adminStepCodoCircle(stepDelta) {
 }
 
 async function adminSetCodoByWeek(weekNum) {
+  // THÊM 2 DÒNG BẢO VỆ
+  lastCloudFetchTime = Date.now() + 60000;
+  isFetchingCloud = false;
+
   const total = CODO_RING_36.length; let preview = [];
   systemUsers.forEach(u => {
     if (u.role !== 'codo') return;
