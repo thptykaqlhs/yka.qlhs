@@ -2153,18 +2153,18 @@ async function fetchDatabaseFromCloud(force = false) {
 
       if (db.users && Array.isArray(db.users) && db.users.length > 1) {
         const incomingUsers = db.users;
-        const isSanitized = incomingUsers.some(u => u.username === 'admin' && u.pass === '');
+        
+        // SỬA LỖI: Lấy 100% dữ liệu từ Cloud (để giữ nguyên mật khẩu học sinh đã đổi)
+        // CHỈ giữ lại mật khẩu Admin ở máy tính cục bộ (local) nếu Server chủ động ẩn đi.
+        systemUsers = incomingUsers.map(cloudU => {
+          const localU = systemUsers.find(u => u.username === cloudU.username);
+          if (cloudU.username === 'admin' && cloudU.pass === '') {
+            return { ...cloudU, pass: localU ? localU.pass : '' };
+          }
+          return cloudU; // Giữ nguyên toàn bộ mật khẩu chuẩn từ Google Drive
+        });
 
-        if (!isSanitized) {
-          systemUsers = incomingUsers; 
-        } else {
-          systemUsers = systemUsers.map(localU => {
-            const inc = incomingUsers.find(u => u.username === localU.username);
-            return inc ? { ...inc, pass: localU.pass } : localU;
-          });
-        }
-
-        if (ensureGvcnAccountsExist()) {
+        if (ensureGvcnAccountsExist()) {a
           updateUsersLocalAndCloud(); 
         }
         localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
