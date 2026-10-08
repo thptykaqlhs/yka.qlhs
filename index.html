@@ -4210,7 +4210,6 @@ function renderHk1ClassTable() {
 
   let xs = 0, tot = 0, kha = 0, yeu = 0;
 
-  // Hiển thị dòng trạng thái đồng bộ phía trên bảng
   if (list.length > 0 && list[0].statusNote) {
     const trNote = document.createElement('tr');
     trNote.innerHTML = `
@@ -4221,8 +4220,16 @@ function renderHk1ClassTable() {
     tbody.appendChild(trNote);
   }
 
+  let currentRank = 1;
   list.forEach((c, idx) => {
-    const rank = idx + 1;
+    if (idx > 0) {
+      const prev = list[idx - 1];
+      if (c.termRank !== prev.termRank || c.remainingPenalty !== prev.remainingPenalty || c.counts['Xuất sắc'] !== prev.counts['Xuất sắc']) {
+        currentRank = idx + 1;
+      }
+    }
+    const rank = currentRank;
+
     let rankBadge = `<span class="rank-pill rank-other">${rank}</span>`;
     if (rank === 1) rankBadge = `<span class="rank-pill rank-1">1</span>`;
     else if (rank === 2) rankBadge = `<span class="rank-pill rank-2">2</span>`;
@@ -4945,7 +4952,6 @@ function renderLeaderboard() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  // Cập nhật dòng tiêu đề hiển thị rõ Tuần mấy, từ ngày nào đến ngày nào
   const titleEl = document.getElementById('boardMainTitle');
   const subEl = document.getElementById('boardWeekSubtitle');
   if (titleEl && wInfo.fmtFrom) {
@@ -4955,8 +4961,17 @@ function renderLeaderboard() {
     subEl.innerHTML = `📅 Thời gian tính điểm: <strong>Tuần ${wInfo.weekNum} (Từ ngày ${wInfo.fmtFrom} đến hết ngày ${wInfo.fmtTo})</strong>`;
   }
 
+  let currentRank = 1; // Biến neo đồng hạng
   list.forEach((c, idx) => {
-    const rank = idx + 1;
+    if (idx > 0) {
+      const prev = list[idx - 1];
+      // Kiểm tra đồng hạng: Cùng danh hiệu, cùng tổng lỗi, cùng điểm trừ sau bù
+      if (c.rankLabel !== prev.rankLabel || c.totalDeductions !== prev.totalDeductions || c.remainingPenalty !== prev.remainingPenalty) {
+        currentRank = idx + 1;
+      }
+    }
+    const rank = currentRank;
+
     let rankBadge = `<span class="rank-pill rank-other">${rank}</span>`;
     if (rank === 1) rankBadge = `<span class="rank-pill rank-1">1</span>`;
     else if (rank === 2) rankBadge = `<span class="rank-pill rank-2">2</span>`;
@@ -5005,7 +5020,6 @@ function renderLeaderboard() {
   }).length;
   document.getElementById('approvedCountStat').textContent = approvedCount;
 }
-// ==================== QUẢN LÝ CỜ ĐỎ TỰ CHỌN LỚP & XOAY VÒNG LIÊN KHỐI 35 TUẦN ====================
 // ==================== QUẢN LÝ CỜ ĐỎ TỰ CHỌN LỚP & XOAY VÒNG LIÊN KHỐI 35 TUẦN ====================
 function setupCodoForm() {
   document.getElementById('codoRecorderInput').value = loggedUser.name;
@@ -7669,9 +7683,22 @@ function computeMonthlySummaryRows() {
     let monthRanks = [];
 
     targetMonths.forEach(m => {
-      const idx = (m.data || []).findIndex(item => item.id === c.id);
-      if (idx !== -1) {
-        const r = idx + 1;
+      // Ép chuẩn đồng hạng trên lịch sử quá khứ
+      const mDataRanks = {};
+      let mCurrentRank = 1;
+      (m.data || []).forEach((item, i) => {
+         if (i > 0) {
+            const prev = m.data[i - 1];
+            if (item.rankLabel !== prev.rankLabel || item.totalDeductions !== prev.totalDeductions || item.remainingPenalty !== prev.remainingPenalty) {
+               mCurrentRank = i + 1;
+            }
+         }
+         mDataRanks[item.id] = mCurrentRank;
+      });
+
+      const r = mDataRanks[c.id];
+      if (r) {
+        const idx = m.data.findIndex(item => item.id === c.id);
         const pen = parseFloat(m.data[idx].remainingPenalty || 0);
         monthRanks.push({ monthName: m.week, rank: r, penalty: pen });
         sumRanks += r;
@@ -7687,25 +7714,17 @@ function computeMonthlySummaryRows() {
     if (show20_11 && r20_11 > 0) sumRanks += r20_11;
     if (show26_3 && r26_3 > 0) sumRanks += r26_3;
 
-    // Nếu các lớp khác đã nhập thứ tự 20/11 hoặc 26/3 mà lớp này chưa nhập thì đẩy xuống dưới khi sắp xếp
     let sortWeight = sumRanks;
     if (show20_11 && hasAny20_11 && r20_11 <= 0) sortWeight += 999;
     if (show26_3 && hasAny26_3 && r26_3 <= 0) sortWeight += 999;
 
     return {
-      id: c.id,
-      grade: c.grade,
-      size: c.size,
-      monthRanks: monthRanks,
-      r20_11: r20_11,
-      r26_3: r26_3,
-      sumRanks: sumRanks,
-      sortWeight: sortWeight,
-      totalMonthlyPenalty: parseFloat(totalMonthlyPenalty.toFixed(1))
+      id: c.id, grade: c.grade, size: c.size,
+      monthRanks: monthRanks, r20_11: r20_11, r26_3: r26_3, sumRanks: sumRanks,
+      sortWeight: sortWeight, totalMonthlyPenalty: parseFloat(totalMonthlyPenalty.toFixed(1))
     };
   });
 
-  // Sắp xếp: Tổng thứ tự NHỎ NHẤT xếp Thứ Nhất (Nếu bằng nhau thì xét thứ tự đợt 20/11-26/3 hoặc tổng điểm trừ tháng thấp hơn)
   rows.sort((a, b) => {
     if (a.sortWeight !== b.sortWeight) return a.sortWeight - b.sortWeight;
     if (show20_11 && a.r20_11 !== b.r20_11 && a.r20_11 > 0 && b.r20_11 > 0) return a.r20_11 - b.r20_11;
@@ -7717,6 +7736,108 @@ function computeMonthlySummaryRows() {
   return { rows, targetMonths, show20_11, show26_3 };
 }
 
+function filterMonthlyViewRows() {
+  if (selectedMonthViewKey.startsWith('DETAIL_')) {
+    filterHistoryRows();
+    return;
+  }
+
+  const tbody = document.getElementById('monthlySummaryTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const isAdminUser = (loggedUser && loggedUser.role === 'admin');
+  const gradeFilter = document.getElementById('historyGradeFilter') ? document.getElementById('historyGradeFilter').value : 'ALL';
+  const q = document.getElementById('historyClassSearch') ? document.getElementById('historyClassSearch').value.trim().toUpperCase() : '';
+
+  const { rows, targetMonths, show20_11, show26_3 } = computeMonthlySummaryRows();
+
+  const filtered = rows.filter(r => {
+    if (gradeFilter !== 'ALL' && r.grade !== gradeFilter) return false;
+    if (q && !r.id.toUpperCase().includes(q)) return false;
+    return true;
+  });
+
+  let currentRank = 1;
+  filtered.forEach((r, idx) => {
+    if (idx > 0) {
+      const prev = filtered[idx - 1];
+      if (r.sortWeight !== prev.sortWeight || r.r20_11 !== prev.r20_11 || r.r26_3 !== prev.r26_3 || r.totalMonthlyPenalty !== prev.totalMonthlyPenalty) {
+        currentRank = idx + 1;
+      }
+    }
+    const rank = currentRank;
+
+    let rankBadge = `<span class="rank-pill rank-other">${rank}</span>`;
+    if (rank === 1) rankBadge = `<span class="rank-pill rank-1">1</span>`;
+    else if (rank === 2) rankBadge = `<span class="rank-pill rank-2">2</span>`;
+    else if (rank === 3) rankBadge = `<span class="rank-pill rank-3">3</span>`;
+
+    let monthColsHtml = '';
+    if (targetMonths.length === 0) {
+      monthColsHtml = `<td style="text-align:center; color:var(--text-muted);">--</td>`;
+    } else {
+      monthColsHtml = r.monthRanks.map(m => {
+        if (!m.rank) return `<td style="text-align:center; color:var(--text-muted);">--</td>`;
+        const penText = m.penalty <= 0 ? `Dư +${Math.abs(m.penalty)}đ` : `-${m.penalty}đ`;
+        return `<td style="text-align:center;">
+          <strong style="font-size:0.95rem; color:var(--primary);">Hạng ${m.rank}</strong>
+          <div style="font-size:0.7rem; color:var(--text-muted);">(${penText})</div>
+        </td>`;
+      }).join('');
+    }
+
+    const baseMonthSum = r.monthRanks.reduce((acc, m) => acc + (m.rank || 0), 0);
+
+    let col20_11Html = '';
+    if (show20_11) {
+      col20_11Html = isAdminUser
+        ? `<td style="text-align:center; background:#fffdf5;">
+             <input type="number" min="1" max="36" id="inp_20_11_${r.id}" value="${r.r20_11 > 0 ? r.r20_11 : ''}"
+               placeholder="Nhập hạng..."
+               oninput="onLiveSpecialRankInput('${r.id}', ${baseMonthSum})"
+               style="width:95px; text-align:center; font-weight:800; color:#b45309; border:2px solid #fcd34d; border-radius:6px; padding:0.3rem;">
+           </td>`
+        : `<td style="text-align:center; background:#fffdf5; font-weight:800; color:#b45309; font-size:0.95rem;">
+             ${r.r20_11 > 0 ? 'Hạng ' + r.r20_11 : '<span style="color:var(--text-muted); font-weight:normal;">Chưa nhập</span>'}
+           </td>`;
+    }
+
+    let col26_3Html = '';
+    if (show26_3) {
+      col26_3Html = isAdminUser
+        ? `<td style="text-align:center; background:#f7fee7;">
+             <input type="number" min="1" max="36" id="inp_26_3_${r.id}" value="${r.r26_3 > 0 ? r.r26_3 : ''}"
+               placeholder="Nhập hạng..."
+               oninput="onLiveSpecialRankInput('${r.id}', ${baseMonthSum})"
+               style="width:95px; text-align:center; font-weight:800; color:#15803d; border:2px solid #86efac; border-radius:6px; padding:0.3rem;">
+           </td>`
+        : `<td style="text-align:center; background:#f7fee7; font-weight:800; color:#15803d; font-size:0.95rem;">
+             ${r.r26_3 > 0 ? 'Hạng ' + r.r26_3 : '<span style="color:var(--text-muted); font-weight:normal;">Chưa nhập</span>'}
+           </td>`;
+    }
+
+    let finalBadge = `<span class="badge badge-gray">Thứ ${rank}</span>`;
+    if (rank === 1) finalBadge = `<span class="badge badge-success" style="font-size:0.82rem;">🥇 Xếp Thứ Nhất</span>`;
+    else if (rank === 2) finalBadge = `<span class="badge badge-info" style="font-size:0.82rem;">🥈 Xếp Thứ Nhì</span>`;
+    else if (rank === 3) finalBadge = `<span class="badge badge-warning" style="font-size:0.82rem;">🥉 Xếp Thứ Ba</span>`;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="text-align:center;">${rankBadge}</td>
+      <td><strong>Chi đoàn ${r.id}</strong></td>
+      <td style="text-align:center;"><span class="badge badge-info">Khối ${r.grade}</span></td>
+      ${monthColsHtml}
+      ${col20_11Html}
+      ${col26_3Html}
+      <td id="cell_sum_rank_${r.id}" style="text-align:center; background:#eff6ff; font-weight:900; font-size:1.1rem; color:var(--primary);">
+        ${r.sumRanks > 0 ? r.sumRanks : '--'}
+      </td>
+      <td style="text-align:center;">${finalBadge}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
 function filterMonthlyViewRows() {
   if (selectedMonthViewKey.startsWith('DETAIL_')) {
     filterHistoryRows();
@@ -7923,8 +8044,16 @@ function filterHistoryRows() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  let currentRank = 1;
   currentObj.data.forEach((c, idx) => {
-    const realRank = idx + 1;
+    if (idx > 0) {
+      const prev = currentObj.data[idx - 1];
+      if (c.rankLabel !== prev.rankLabel || c.totalDeductions !== prev.totalDeductions || c.remainingPenalty !== prev.remainingPenalty) {
+        currentRank = idx + 1;
+      }
+    }
+    const realRank = currentRank;
+
     const cGrade = c.grade || (c.id.startsWith('10') ? '10' : (c.id.startsWith('11') ? '11' : '12'));
     
     if (gradeFilter !== 'ALL' && cGrade !== gradeFilter) return;
