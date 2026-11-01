@@ -2313,13 +2313,11 @@ function renderCodoAssignTable() {
   
   const codoUsers = systemUsers.filter(u => u.role === 'codo');
   codoUsers.forEach((u, idx) => {
-    // Quan trọng: Lấy ID thật trong mảng hệ thống
     const realIdx = systemUsers.indexOf(u); 
     const homeClass = u.username.replace('codo_', '').toUpperCase();
     const currentAssigned = (u.scope && u.scope[0]) ? String(u.scope[0]).toUpperCase() : '';
     const isLocked = (u.codoLocked === true && currentAssigned !== '' && currentAssigned !== homeClass);
     
-    // Giao diện Nút khóa
     let lockBtnHtml = isLocked
       ? `<button type="button" class="btn btn-sm" onclick="toggleSingleCodoLock(${realIdx})" style="background:#dcfce7; color:#166534; border:1px solid #86efac; white-space:nowrap; font-weight:700; min-width:105px; padding:0.4rem;" title="Bấm để MỞ KHÓA">🔒 Đã khóa</button>`
       : `<button type="button" class="btn btn-sm" onclick="toggleSingleCodoLock(${realIdx})" style="background:#fffbeb; color:#b45309; border:1px solid #fcd34d; white-space:nowrap; font-weight:700; min-width:105px; padding:0.4rem;" title="Bấm để KHÓA LỚP NÀY">🔓 Mở chọn</button>`;
@@ -2329,11 +2327,32 @@ function renderCodoAssignTable() {
       <td style="text-align:center;">${idx + 1}</td>
       <td><strong>${u.name}</strong> <br><span style="font-size:0.75rem; color:var(--text-muted);">(${u.username})</span></td>
       <td>
-        <input type="text" id="codo_assign_scope_${realIdx}" value="${currentAssigned}" placeholder="Nhập lớp (VD: 10A5)" style="width:140px; font-weight:bold; color:var(--primary); padding:0.35rem 0.5rem; border: 2px solid var(--border-light); border-radius: 6px; text-transform: uppercase;">
+        <input type="text" id="codo_assign_scope_${realIdx}" value="${currentAssigned}" onchange="onAdminEditCodoScopeInput(${realIdx})" placeholder="Nhập lớp (VD: 10A5)" style="width:140px; font-weight:bold; color:var(--primary); padding:0.35rem 0.5rem; border: 2px solid var(--border-light); border-radius: 6px; text-transform: uppercase;">
       </td>
       <td style="text-align:center;">${lockBtnHtml}</td>
     `;
     tbody.appendChild(tr);
+  });
+}
+
+function onAdminEditCodoScopeInput(realIdx) {
+  const u = systemUsers[realIdx];
+  if (!u || u.role !== 'codo') return;
+  const sEl = document.getElementById(`codo_assign_scope_${realIdx}`);
+  if (!sEl) return;
+
+  const newScope = sEl.value.trim().toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
+  const homeClass = u.username.replace('codo_', '').toUpperCase();
+  u.scope = newScope.length > 0 ? newScope : [homeClass];
+  u.codoLocked = (u.scope[0] !== homeClass);
+
+  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+  renderCodoAssignTable();
+  updateSingleCodoScopeOnCloud(u.username, u.scope, u.codoLocked);
+  publishUpdate('UPDATE_CODO_SCOPE', {
+    username: u.username,
+    scope: u.scope,
+    codoLocked: u.codoLocked
   });
 }
 function refreshStudentDatalists() {
@@ -2379,6 +2398,16 @@ function getDynamicClasses() {
   STUDENTS_DB.forEach(s => {
     classSizes[s.classId] = (classSizes[s.classId] || 0) + 1;
   });
+
+  // Nếu máy mới mở chưa kịp tải STUDENTS_DB về, tự động tạo khung 36 lớp chuẩn (10A1..12A12)
+  if (Object.keys(classSizes).length === 0) {
+    ['10', '11', '12'].forEach(g => {
+      for (let i = 1; i <= 12; i++) {
+        classSizes[`${g}A${i}`] = 43;
+      }
+    });
+  }
+
   const classes = [];
   Object.keys(classSizes).sort((a, b) => a.localeCompare(b, undefined, {numeric: true})).forEach(cid => {
     const grade = cid.startsWith('10') ? '10' : (cid.startsWith('11') ? '11' : '12');
@@ -3546,18 +3575,6 @@ function resetDefaultConductConfig() {
   }
 }
 
-function initHk1ClassFilter() {
-  const sel = document.getElementById('hk1FilterClass');
-  if (!sel || sel.options.length > 1) return;
-  const classes = Array.from(new Set(STUDENTS_DB.map(s => s.classId))).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
-  classes.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c;
-    opt.textContent = `Chi đoàn ${c}`;
-    sel.appendChild(opt);
-  });
-}
-
 function isDateInSelectedTerm(dateStr, term) {
   if (!dateStr || term === 'YEAR') return true;
   const cutoff = CONDUCT_CONFIG.hk1EndDate || '2027-01-15';
@@ -4707,19 +4724,37 @@ function saveFullSdbData() {
 }
 function renderAdminSdbOverviewTable() {
   const tbody = document.getElementById('adminSdbOverviewBody');
+  if (!tbody) return;
   tbody.innerHTML = '';
+
+  const cfg = (typeof CONDUCT_CONFIG !== 'undefined') ? CONDUCT_CONFIG : {};
+  const goodPt = cfg.scoreGoodBonus !== undefined ? cfg.scoreGoodBonus : 1;
+  const poorPt = cfg.scorePoorPenalty !== undefined ? cfg.scorePoorPenalty : 2;
+  const maxGvcn = cfg.maxGvcnBonus !== undefined ? cfg.maxGvcnBonus : 3;
+
+  const weekSel = document.getElementById('inputWeekSelect_sdb');
+  const fromD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.from : null;
+  const toD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.to : null;
+
   CLASSES.forEach(c => {
-    const s = sdbFullData[c.id] || { total: 30, good: 30, fair: 0, medium: 0, weak: 0, poor: 0, absences: [], goodScores: 0, poorScores: 0 };
+    const s = sdbFullData[c.id] || { total: 30, good: 30, fair: 0, medium: 0, weak: 0, poor: 0, absences: [], goodScores: 0, gvcnScores: 0, poorScores: 0 };
     const hourPenalty = (s.fair * 1) + (s.medium * 3) + (s.weak * 5) + (s.poor * 7);
     const hourBonus = (s.good === s.total && s.total > 0);
 
+    const activeAbsences = (s.absences || []).filter(a => {
+      if (fromD && toD) return a.date >= fromD && a.date <= toD;
+      return !a.isArchived;
+    });
+
     let absMinus = 0;
-    (s.absences || []).forEach(a => absMinus += Math.abs(a.point));
+    activeAbsences.forEach(a => absMinus += Math.abs(a.point));
 
-    const cpCount = (s.absences || []).filter(a => a.type === 'A01').length;
-    const kpCount = (s.absences || []).filter(a => a.type === 'A02').length;
+    const cpCount = activeAbsences.filter(a => a.type === 'A01').length;
+    const kpCount = activeAbsences.filter(a => a.type === 'A02').length;
 
-    const academicBal = ((s.goodScores || 0) * 1) - ((s.poorScores || 0) * 2);
+    const validGvcn = Math.min((s.gvcnScores || 0), maxGvcn);
+    const totalGoodCount = (s.goodScores || 0) + validGvcn;
+    const academicBal = (totalGoodCount * goodPt) - ((s.poorScores || 0) * poorPt);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -4730,7 +4765,7 @@ function renderAdminSdbOverviewTable() {
       <td style="text-align:center;">${hourBonus ? '<span class="badge badge-success">+20 đ</span>' : '--'}</td>
       <td style="text-align:center;">${cpCount} có phép / ${kpCount} k.phép</td>
       <td style="text-align:center; color:var(--danger); font-weight:bold;">${absMinus > 0 ? '-' + absMinus : '0'} đ</td>
-      <td style="text-align:center;"><span style="color:var(--success); font-weight:600;">+${s.goodScores || 0}</span> / <span style="color:var(--danger); font-weight:600;">-${s.poorScores || 0}</span></td>
+      <td style="text-align:center;"><span style="color:var(--success); font-weight:600;">+${totalGoodCount}</span> / <span style="color:var(--danger); font-weight:600;">-${s.poorScores || 0}</span></td>
       <td style="text-align:center; font-weight:bold; color:${academicBal >= 0 ? 'var(--success)' : 'var(--danger)'};">${academicBal >= 0 ? '+' : ''}${academicBal} đ</td>
     `;
     tbody.appendChild(tr);
@@ -4739,8 +4774,14 @@ function renderAdminSdbOverviewTable() {
 
 // ==================== TÍNH TOÁN BẢNG XẾP HẠNG 36 CHI ĐOÀN (HIỂN THỊ RÕ TUẦN & NGÀY THÁNG) ====================
 
-// Hàm khởi tạo danh sách chọn Tuần trên Bảng Xếp Hạng và tự động chọn Tuần hiện tại
-// Hàm khởi tạo danh sách chọn Tuần trên Bảng Xếp Hạng và tự động đồng bộ dấu tích (✅) khi Chốt / Hoàn tác
+// Hàm phụ trợ lấy ngày chuẩn theo múi giờ Việt Nam (GMT+7), chống lỗi lùi 1 ngày của toISOString()
+function toLocalYMD(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function initBoardWeekSelect() {
   const sel = document.getElementById('boardFilterWeek');
   if (!sel) return;
@@ -4748,14 +4789,12 @@ function initBoardWeekSelect() {
   const startStr = (typeof getWeek1StartDate === 'function') ? getWeek1StartDate() : (localStorage.getItem('yka_week1_start') || '2026-09-07');
   const currentSelected = sel.value;
 
-  // Tạo dấu vân tay ghi nhận các tuần đã chốt để tự động vẽ lại ngay khi Chốt hoặc Hoàn tác
   const finalizedWeeksKey = weeklyHistory
     .filter(h => !h.type || h.type === 'WEEK')
     .map(h => h.weekNumber || h.week)
     .join(',');
   const stateSignature = `${startStr}|${finalizedWeeksKey}`;
 
-  // Nếu chưa tạo danh sách, hoặc đổi ngày Tuần 1, hoặc vừa Chốt / Xóa tuần thì vẽ lại ngay
   if (sel.options.length === 0 || sel.dataset.stateSignature !== stateSignature) {
     sel.dataset.stateSignature = stateSignature;
     sel.innerHTML = '';
@@ -4763,7 +4802,7 @@ function initBoardWeekSelect() {
     const baseDate = new Date(startStr + 'T00:00:00');
     if (isNaN(baseDate.getTime())) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalYMD(new Date());
     let activeWeek = 1;
     let foundCurrentByDate = false;
 
@@ -4773,12 +4812,11 @@ function initBoardWeekSelect() {
       const dTo = new Date(dFrom);
       dTo.setDate(dFrom.getDate() + 6);
 
-      const fromYMD = dFrom.toISOString().split('T')[0];
-      const toYMD = dTo.toISOString().split('T')[0];
+      const fromYMD = toLocalYMD(dFrom);
+      const toYMD = toLocalYMD(dTo);
       const fmtFrom = `${fromYMD.split('-')[2]}/${fromYMD.split('-')[1]}/${fromYMD.split('-')[0]}`;
       const fmtTo = `${toYMD.split('-')[2]}/${toYMD.split('-')[1]}/${toYMD.split('-')[0]}`;
 
-      // Kiểm tra tuần này đã chốt chưa
       const isFinalized = weeklyHistory.some(h => 
         (!h.type || h.type === 'WEEK') && 
         (h.weekNumber === w || (h.week && (h.week.toLowerCase().startsWith(`tuần ${w} `) || h.week.toLowerCase() === `tuần ${w}`)))
@@ -4799,7 +4837,6 @@ function initBoardWeekSelect() {
       sel.appendChild(opt);
     }
 
-    // Nếu ngày hôm nay nằm ngoài 35 tuần, ưu tiên chọn tuần đầu tiên chưa chốt
     if (!foundCurrentByDate) {
       for (let w = 1; w <= 35; w++) {
         const isFinalized = weeklyHistory.some(h => (!h.type || h.type === 'WEEK') && h.weekNumber === w);
@@ -4811,7 +4848,6 @@ function initBoardWeekSelect() {
   }
 }
 
-// Hàm lấy thông tin Tuần và Khoảng ngày đang chọn trên Bảng Xếp Hạng
 function getSelectedBoardWeekInfo() {
   initBoardWeekSelect();
   const sel = document.getElementById('boardFilterWeek');
@@ -4828,7 +4864,7 @@ function getSelectedBoardWeekInfo() {
   return { weekNum: 1, fromDate: '', toDate: '', fmtFrom: '', fmtTo: '' };
 }
 
-// Hàm chuẩn tính điểm Tập thể Lớp (Dùng chung cho cả Bảng Xếp Hạng và Chốt Tuần)
+// TÍNH ĐIỂM TẬP THỂ LỚP: Đã bỏ toàn bộ tiêu chí phụ (hasBadLesson, hasSevereViolation, hasCriticalViolation)
 function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
   const approvedViolations = violations.filter(v => {
     if (v.classId !== c.id || v.status !== 'Đã duyệt') return false;
@@ -4839,16 +4875,13 @@ function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
   });
 
   let codoPenalties = 0, personalBonus = 0, classBonus = 0;
-  let maxSingleViolation = 0;
 
   approvedViolations.forEach(v => {
     if (v.isClassBonus) {
       classBonus += v.points;
     } else {
       if (v.points < 0) {
-        const absP = Math.abs(v.points);
-        codoPenalties += absP;
-        if (absP > maxSingleViolation) maxSingleViolation = absP;
+        codoPenalties += Math.abs(v.points);
       } else {
         personalBonus += v.points;
       }
@@ -4867,14 +4900,12 @@ function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
   const sdbPoorScorePenalty = (sdb.poorScores || 0) * poorPt;
 
   let sdbAbsencePenalty = 0;
-  let unexcusedCount = 0;
   const fullSdbClass = sdbFullData[c.id] || sdb;
   (fullSdbClass.absences || []).filter(a => {
     if (fromDate && toDate) return a.date >= fromDate && a.date <= toDate;
     return !a.isArchived;
   }).forEach(a => {
     sdbAbsencePenalty += Math.abs(a.point);
-    if (a.type === 'A02') unexcusedCount++;
   });
 
   const validGvcn = Math.min((sdb.gvcnScores || 0), maxGvcn);
@@ -4885,20 +4916,15 @@ function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
   const totalAdditions = parseFloat((personalBonus + classBonus + sdbGoodScoreBonus + sdbHourBonus).toFixed(1));
   const remainingPenalty = parseFloat((totalDeductions - totalAdditions).toFixed(1));
 
-  // Xét xếp loại Tập thể Tuần (Có điều kiện khống chế lỗi nặng để tránh lạm phát điểm cộng bù)
-  const hasBadLesson = (sdb.weak > 0 || sdb.poor > 0);
-  const hasSevereViolation = (maxSingleViolation >= 30 || unexcusedCount > 0);
-  const hasCriticalViolation = (maxSingleViolation >= 100 || sdb.poor > 0);
-
+  // Xếp loại thuần túy theo Tổng điểm sau bù (remainingPenalty), không dùng bất kỳ tiêu chí phụ nào
   let rankLabel = 'Xuất sắc', bClass = 'badge-success';
-  if (remainingPenalty > 80 || hasCriticalViolation) {
+  if (remainingPenalty > 80) {
     rankLabel = 'Chưa đạt'; bClass = 'badge-danger';
   } else if (remainingPenalty > 50) {
     rankLabel = 'Đạt'; bClass = 'badge-gray';
   } else if (remainingPenalty > 30) {
     rankLabel = 'Khá'; bClass = 'badge-warning';
-  } else if (remainingPenalty > 0 || hasSevereViolation || hasBadLesson) {
-    // Nếu điểm trừ sau bù <= 0 nhưng lớp có lỗi nặng (>=30đ) hoặc nghỉ KP / tiết Yếu thì tối đa chỉ đạt TỐT
+  } else if (remainingPenalty > 0) {
     rankLabel = 'Tốt'; bClass = 'badge-info';
   } else {
     rankLabel = 'Xuất sắc'; bClass = 'badge-success';
@@ -4913,19 +4939,13 @@ function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
   };
 }
 
+// SẮP XẾP THỨ HẠNG: Chỉ xét duy nhất Tổng điểm (remainingPenalty nhỏ nhất = Tổng điểm cao nhất xếp thứ nhất)
 function sortClassScoreList(list) {
-  const rankWeight = { 'Xuất sắc': 5, 'Tốt': 4, 'Khá': 3, 'Đạt': 2, 'Chưa đạt': 1 };
   return list.sort((a, b) => {
-    // 1. Ưu tiên xếp theo bậc Danh hiệu trước (Xuất sắc -> Tốt -> Khá -> Đạt -> Chưa đạt)
-    if (rankWeight[b.rankLabel] !== rankWeight[a.rankLabel]) {
-      return rankWeight[b.rankLabel] - rankWeight[a.rankLabel];
+    if (a.remainingPenalty !== b.remainingPenalty) {
+      return a.remainingPenalty - b.remainingPenalty;
     }
-    // 2. Nếu cùng đạt Xuất sắc (<= 0đ), lớp nào ÍT VI PHẠM GỐC HƠN (totalDeductions nhỏ hơn) sẽ xếp trên!
-    if (a.remainingPenalty <= 0 && b.remainingPenalty <= 0 && a.totalDeductions !== b.totalDeductions) {
-      return a.totalDeductions - b.totalDeductions;
-    }
-    // 3. Cuối cùng mới xét đến hiệu số điểm trừ còn lại
-    return a.remainingPenalty - b.remainingPenalty;
+    return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
 }
 
@@ -4933,7 +4953,6 @@ function calculateClassScores() {
   const gradeFilter = document.getElementById('boardFilterGrade') ? document.getElementById('boardFilterGrade').value : 'ALL';
   const wInfo = getSelectedBoardWeekInfo();
 
-  // Nếu Tuần đang chọn đã từng được chốt trong Lịch sử -> Lấy đúng bản lưu SĐB của tuần đó để không bị mất điểm SĐB
   const archivedWeek = weeklyHistory.find(h => 
     (!h.type || h.type === 'WEEK') && h.weekNumber === wInfo.weekNum
   );
@@ -4945,6 +4964,7 @@ function calculateClassScores() {
   return sortClassScoreList(list);
 }
 
+// HIỂN THỊ BẢNG XẾP HẠNG: Bằng điểm tổng (remainingPenalty) là xếp cùng hạng
 function renderLeaderboard() {
   const wInfo = getSelectedBoardWeekInfo();
   const list = calculateClassScores();
@@ -4961,12 +4981,12 @@ function renderLeaderboard() {
     subEl.innerHTML = `📅 Thời gian tính điểm: <strong>Tuần ${wInfo.weekNum} (Từ ngày ${wInfo.fmtFrom} đến hết ngày ${wInfo.fmtTo})</strong>`;
   }
 
-  let currentRank = 1; // Biến neo đồng hạng
+  let currentRank = 1;
   list.forEach((c, idx) => {
     if (idx > 0) {
       const prev = list[idx - 1];
-      // Kiểm tra đồng hạng: Cùng danh hiệu, cùng tổng lỗi, cùng điểm trừ sau bù
-      if (c.rankLabel !== prev.rankLabel || c.totalDeductions !== prev.totalDeductions || c.remainingPenalty !== prev.remainingPenalty) {
+      // Chỉ so sánh duy nhất Tổng điểm (remainingPenalty): Bằng nhau thì giữ nguyên currentRank
+      if (c.remainingPenalty !== prev.remainingPenalty) {
         currentRank = idx + 1;
       }
     }
@@ -5009,9 +5029,9 @@ function renderLeaderboard() {
   const k10 = list.find(l => l.grade === '10');
   const k11 = list.find(l => l.grade === '11');
   const k12 = list.find(l => l.grade === '12');
-  if (k10) document.getElementById('topK10').textContent = `10${k10.id.replace('10','')} (${k10.remainingPenalty <= 0 ? 'Hết trừ' : '-' + k10.remainingPenalty + 'đ'})`;
-  if (k11) document.getElementById('topK11').textContent = `11${k11.id.replace('11','')} (${k11.remainingPenalty <= 0 ? 'Hết trừ' : '-' + k11.remainingPenalty + 'đ'})`;
-  if (k12) document.getElementById('topK12').textContent = `12${k12.id.replace('12','')} (${k12.remainingPenalty <= 0 ? 'Hết trừ' : '-' + k12.remainingPenalty + 'đ'})`;
+  if (k10) document.getElementById('topK10').textContent = `${k10.id} (${k10.remainingPenalty <= 0 ? 'Dư +' + Math.abs(k10.remainingPenalty) + 'đ' : '-' + k10.remainingPenalty + 'đ'})`;
+  if (k11) document.getElementById('topK11').textContent = `${k11.id} (${k11.remainingPenalty <= 0 ? 'Dư +' + Math.abs(k11.remainingPenalty) + 'đ' : '-' + k11.remainingPenalty + 'đ'})`;
+  if (k12) document.getElementById('topK12').textContent = `${k12.id} (${k12.remainingPenalty <= 0 ? 'Dư +' + Math.abs(k12.remainingPenalty) + 'đ' : '-' + k12.remainingPenalty + 'đ'})`;
 
   const approvedCount = violations.filter(v => {
     if (v.status !== 'Đã duyệt') return false;
@@ -6832,13 +6852,18 @@ function saveUserAccountsToStorage() {
 function exportLeaderboardCSV() {
   const list = calculateClassScores();
   let csv = "\uFEFFHạng,Chi đoàn,Khối,Sĩ số,Trừ nề nếp & ATGT,Trừ tiết học & Điểm kém,Trừ nghỉ học,TỔNG ĐIỂM BỊ TRỪ,TỔNG ĐIỂM CỘNG BÙ,ĐIỂM TRỪ CÒN LẠI (SAU BÙ),Xếp loại tập thể\n";
+  let currentRank = 1;
   list.forEach((c, idx) => {
-    csv += `${idx + 1},Chi đoàn ${c.id},${c.grade},${c.size},-${c.codoPenalties},-${c.academicPenalties},-${c.sdbAbsencePenalty},-${c.totalDeductions},+${c.totalAdditions},${c.remainingPenalty <= 0 ? 0 : '-' + c.remainingPenalty},${c.rankLabel}\n`;
+    if (idx > 0 && c.remainingPenalty !== list[idx - 1].remainingPenalty) {
+      currentRank = idx + 1;
+    }
+    const penStr = c.remainingPenalty <= 0 ? `+${Math.abs(c.remainingPenalty)}` : `-${c.remainingPenalty}`;
+    csv += `${currentRank},Chi đoàn ${c.id},${c.grade},${c.size},-${c.codoPenalties},-${c.academicPenalties},-${c.sdbAbsencePenalty},-${c.totalDeductions},+${c.totalAdditions},${penStr},${c.rankLabel}\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `Thi_Dua_31_Chi_Doan_THPT_Yen_Khanh_A_Theo_Diem_Tru.csv`;
+  a.download = `Thi_Dua_36_Chi_Doan_THPT_Yen_Khanh_A_Theo_Diem_Tru.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -6852,31 +6877,38 @@ function exportStudentViolationsCSV() {
   const map = {};
 
   violations.filter(v => {
-      if (v.status !== 'Đã duyệt' || v.isClassBonus) return false;
-      if (fromDate && v.date < fromDate) return false;
-      if (toDate && v.date > toDate) return false;
-      return true;
+    if (v.status !== 'Đã duyệt' || v.isClassBonus || isCollectiveRecord(v.student)) return false;
+    if (!fromDate && !toDate && v.isArchived) return false;
+    if (fromDate && v.date < fromDate) return false;
+    if (toDate && v.date > toDate) return false;
+    return true;
   }).forEach(v => {
-    const key = `${v.classId}_${v.student}`;
+    const matched = (typeof matchStudentInClass === 'function') ? matchStudentInClass(v.classId, v.student) : null;
+    const stdName = matched ? matched.name : v.student.trim();
+    const key = matched ? matched.id : `${v.classId}_${stdName.toLowerCase()}`;
+
     if (!map[key]) {
-      map[key] = { classId: v.classId, name: v.student, minus: 0, plus: 0, details: [] };
+      map[key] = { classId: v.classId, name: stdName, minus: 0, plus: 0, details: [] };
     }
     if (v.points < 0) map[key].minus += Math.abs(v.points);
     else map[key].plus += v.points;
     map[key].details.push(`[${v.date}] ${v.name} (${v.points > 0 ? '+' : ''}${v.points}đ)`);
   });
 
-  // Nghỉ học
   Object.keys(sdbFullData).forEach(cid => {
     const s = sdbFullData[cid];
     (s.absences || []).filter(a => {
-        if (fromDate && a.date < fromDate) return false;
-        if (toDate && a.date > toDate) return false;
-        return true;
+      if (!fromDate && !toDate && a.isArchived) return false;
+      if (fromDate && a.date < fromDate) return false;
+      if (toDate && a.date > toDate) return false;
+      return true;
     }).forEach(a => {
-      const key = `${cid}_${a.student}`;
+      const matched = (typeof matchStudentInClass === 'function') ? matchStudentInClass(cid, a.student) : null;
+      const stdName = matched ? matched.name : a.student.trim();
+      const key = matched ? matched.id : `${cid}_${stdName.toLowerCase()}`;
+
       if (!map[key]) {
-        map[key] = { classId: cid, name: a.student, minus: 0, plus: 0, details: [] };
+        map[key] = { classId: cid, name: stdName, minus: 0, plus: 0, details: [] };
       }
       map[key].minus += Math.abs(a.point);
       map[key].details.push(`[SĐB ${a.date}] ${a.type === 'A01' ? 'Nghỉ có phép' : 'Nghỉ KHÔNG phép'} (${a.point}đ)`);
@@ -6884,14 +6916,16 @@ function exportStudentViolationsCSV() {
   });
 
   const list = Object.values(map).filter(s => s.name.toLowerCase().includes(q) || s.classId.toLowerCase().includes(q));
+  const cfg = (typeof CONDUCT_CONFIG !== 'undefined') ? CONDUCT_CONFIG : { weeklyBaseScore: 100, minAvgGood: 90, minAvgFair: 75, minAvgPass: 50 };
 
   let csv = "\uFEFFChi đoàn,Họ và tên học sinh,Tổng trừ,Tổng cộng,Điểm rèn luyện còn lại,Xếp loại,Chi tiết vi phạm/nghỉ học\n";
   list.forEach(s => {
-    const finalPt = Math.max(0, Math.min(100, 100 - s.minus + s.plus));
+    const baseScore = cfg.weeklyBaseScore || 100;
+    const finalPt = Math.max(0, Math.min(baseScore, baseScore - s.minus + s.plus));
     let r = 'Chưa đạt';
-    if (finalPt >= (CONDUCT_CONFIG?.minAvgGood || 90)) r = 'Tốt';
-    else if (finalPt >= (CONDUCT_CONFIG?.minAvgFair || 75)) r = 'Khá';
-    else if (finalPt >= (CONDUCT_CONFIG?.minAvgPass || 50)) r = 'Đạt';
+    if (finalPt >= (cfg.minAvgGood || 90)) r = 'Tốt';
+    else if (finalPt >= (cfg.minAvgFair || 75)) r = 'Khá';
+    else if (finalPt >= (cfg.minAvgPass || 50)) r = 'Đạt';
 
     const detailSanitized = `"${s.details.join('; ').replace(/"/g, '""')}"`;
     csv += `Chi đoàn ${s.classId},"${s.name}",-${s.minus.toFixed(1)},+${s.plus},${finalPt.toFixed(1)},${r},${detailSanitized}\n`;
@@ -6905,7 +6939,6 @@ function exportStudentViolationsCSV() {
   a.click();
   document.body.removeChild(a);
 }
-
 // ==================== QUẢN LÝ HỌC SINH ====================
 // ==================== QUẢN LÝ HỌC SINH ====================
 function renderStudentManagementTable() {
@@ -7170,10 +7203,12 @@ function renderAlerts() {
   tbodyClass.innerHTML = '';
 
   const map = {};
-  // 1. Lọc học sinh vi phạm chưa chốt sổ
   violations.filter(v => v.status === 'Đã duyệt' && !v.isClassBonus && !v.isArchived && !isCollectiveRecord(v.student)).forEach(v => {
-    const key = `${v.classId}_${v.student}`;
-    if (!map[key]) map[key] = { classId: v.classId, name: v.student, minus: 0, count: 0, details: [] };
+    const matched = (typeof matchStudentInClass === 'function') ? matchStudentInClass(v.classId, v.student) : null;
+    const stdName = matched ? matched.name : v.student.trim();
+    const key = matched ? matched.id : `${v.classId}_${stdName.toLowerCase()}`;
+
+    if (!map[key]) map[key] = { classId: v.classId, name: stdName, minus: 0, count: 0, details: [] };
     if (v.points < 0) {
       map[key].minus += Math.abs(v.points);
       map[key].count++;
@@ -7181,11 +7216,13 @@ function renderAlerts() {
     }
   });
 
-  // 2. Lọc nghỉ học không phép trong Sổ đầu bài
   Object.keys(sdbFullData).forEach(cid => {
     (sdbFullData[cid].absences || []).filter(a => !a.isArchived).forEach(a => {
-      const key = `${cid}_${a.student}`;
-      if (!map[key]) map[key] = { classId: cid, name: a.student, minus: 0, count: 0, details: [] };
+      const matched = (typeof matchStudentInClass === 'function') ? matchStudentInClass(cid, a.student) : null;
+      const stdName = matched ? matched.name : a.student.trim();
+      const key = matched ? matched.id : `${cid}_${stdName.toLowerCase()}`;
+
+      if (!map[key]) map[key] = { classId: cid, name: stdName, minus: 0, count: 0, details: [] };
       if (a.type === 'A02') {
         map[key].minus += 10;
         map[key].count++;
@@ -7211,8 +7248,6 @@ function renderAlerts() {
     tbodyStudent.innerHTML = '<tr><td colspan="5" style="text-align:center;">Tuần này chưa có học sinh nào bị báo động đỏ. Tuyệt vời! 🎉</td></tr>';
   }
 
-  // 3. Lọc Chi đoàn ở ngưỡng nguy hiểm (Đồng bộ cùng tập dữ liệu chưa chốt !isArchived với bảng Học sinh ở trên)
-  // Cảnh báo ngay khi: Điểm trừ sau bù >= 35đ, HOẶC Tổng điểm bị trừ gốc >= 50đ (tránh bị điểm cộng SĐB che mất lỗi nặng), HOẶC xếp loại Đạt / Chưa đạt
   const activeClassScores = sortClassScoreList(
     CLASSES.map(c => computeClassScoreItem(c, null, null, sdbFullData))
   );
@@ -7315,8 +7350,8 @@ function populateWeekFinalizeDropdown() {
     const dTo = new Date(dFrom);
     dTo.setDate(dFrom.getDate() + 6);
 
-    const fromYMD = dFrom.toISOString().split('T')[0];
-    const toYMD = dTo.toISOString().split('T')[0];
+    const fromYMD = toLocalYMD(dFrom);
+    const toYMD = toLocalYMD(dTo);
 
     const isAlreadyFinalized = weeklyHistory.some(h => 
       (!h.type || h.type === 'WEEK') && 
@@ -7358,7 +7393,6 @@ function populateWeekFinalizeDropdown() {
   }
   onSelectYearTermChange();
 }
-
 function onSelectYearTermChange() {
   const termSel = document.getElementById('selectYearTermToFinalize');
   const yFromSel = document.getElementById('yearFromWeekSelect');
@@ -7683,17 +7717,17 @@ function computeMonthlySummaryRows() {
     let monthRanks = [];
 
     targetMonths.forEach(m => {
-      // Ép chuẩn đồng hạng trên lịch sử quá khứ
+      // Đồng hạng theo đúng Tổng điểm (remainingPenalty)
       const mDataRanks = {};
       let mCurrentRank = 1;
       (m.data || []).forEach((item, i) => {
-         if (i > 0) {
-            const prev = m.data[i - 1];
-            if (item.rankLabel !== prev.rankLabel || item.totalDeductions !== prev.totalDeductions || item.remainingPenalty !== prev.remainingPenalty) {
-               mCurrentRank = i + 1;
-            }
-         }
-         mDataRanks[item.id] = mCurrentRank;
+        if (i > 0) {
+          const prev = m.data[i - 1];
+          if (item.remainingPenalty !== prev.remainingPenalty) {
+            mCurrentRank = i + 1;
+          }
+        }
+        mDataRanks[item.id] = mCurrentRank;
       });
 
       const r = mDataRanks[c.id];
@@ -7727,8 +7761,6 @@ function computeMonthlySummaryRows() {
 
   rows.sort((a, b) => {
     if (a.sortWeight !== b.sortWeight) return a.sortWeight - b.sortWeight;
-    if (show20_11 && a.r20_11 !== b.r20_11 && a.r20_11 > 0 && b.r20_11 > 0) return a.r20_11 - b.r20_11;
-    if (show26_3 && a.r26_3 !== b.r26_3 && a.r26_3 > 0 && b.r26_3 > 0) return a.r26_3 - b.r26_3;
     if (a.totalMonthlyPenalty !== b.totalMonthlyPenalty) return a.totalMonthlyPenalty - b.totalMonthlyPenalty;
     return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
@@ -7762,106 +7794,12 @@ function filterMonthlyViewRows() {
   filtered.forEach((r, idx) => {
     if (idx > 0) {
       const prev = filtered[idx - 1];
-      if (r.sortWeight !== prev.sortWeight || r.r20_11 !== prev.r20_11 || r.r26_3 !== prev.r26_3 || r.totalMonthlyPenalty !== prev.totalMonthlyPenalty) {
+      if (r.sortWeight !== prev.sortWeight || r.totalMonthlyPenalty !== prev.totalMonthlyPenalty) {
         currentRank = idx + 1;
       }
     }
     const rank = currentRank;
 
-    let rankBadge = `<span class="rank-pill rank-other">${rank}</span>`;
-    if (rank === 1) rankBadge = `<span class="rank-pill rank-1">1</span>`;
-    else if (rank === 2) rankBadge = `<span class="rank-pill rank-2">2</span>`;
-    else if (rank === 3) rankBadge = `<span class="rank-pill rank-3">3</span>`;
-
-    let monthColsHtml = '';
-    if (targetMonths.length === 0) {
-      monthColsHtml = `<td style="text-align:center; color:var(--text-muted);">--</td>`;
-    } else {
-      monthColsHtml = r.monthRanks.map(m => {
-        if (!m.rank) return `<td style="text-align:center; color:var(--text-muted);">--</td>`;
-        const penText = m.penalty <= 0 ? `Dư +${Math.abs(m.penalty)}đ` : `-${m.penalty}đ`;
-        return `<td style="text-align:center;">
-          <strong style="font-size:0.95rem; color:var(--primary);">Hạng ${m.rank}</strong>
-          <div style="font-size:0.7rem; color:var(--text-muted);">(${penText})</div>
-        </td>`;
-      }).join('');
-    }
-
-    const baseMonthSum = r.monthRanks.reduce((acc, m) => acc + (m.rank || 0), 0);
-
-    let col20_11Html = '';
-    if (show20_11) {
-      col20_11Html = isAdminUser
-        ? `<td style="text-align:center; background:#fffdf5;">
-             <input type="number" min="1" max="36" id="inp_20_11_${r.id}" value="${r.r20_11 > 0 ? r.r20_11 : ''}"
-               placeholder="Nhập hạng..."
-               oninput="onLiveSpecialRankInput('${r.id}', ${baseMonthSum})"
-               style="width:95px; text-align:center; font-weight:800; color:#b45309; border:2px solid #fcd34d; border-radius:6px; padding:0.3rem;">
-           </td>`
-        : `<td style="text-align:center; background:#fffdf5; font-weight:800; color:#b45309; font-size:0.95rem;">
-             ${r.r20_11 > 0 ? 'Hạng ' + r.r20_11 : '<span style="color:var(--text-muted); font-weight:normal;">Chưa nhập</span>'}
-           </td>`;
-    }
-
-    let col26_3Html = '';
-    if (show26_3) {
-      col26_3Html = isAdminUser
-        ? `<td style="text-align:center; background:#f7fee7;">
-             <input type="number" min="1" max="36" id="inp_26_3_${r.id}" value="${r.r26_3 > 0 ? r.r26_3 : ''}"
-               placeholder="Nhập hạng..."
-               oninput="onLiveSpecialRankInput('${r.id}', ${baseMonthSum})"
-               style="width:95px; text-align:center; font-weight:800; color:#15803d; border:2px solid #86efac; border-radius:6px; padding:0.3rem;">
-           </td>`
-        : `<td style="text-align:center; background:#f7fee7; font-weight:800; color:#15803d; font-size:0.95rem;">
-             ${r.r26_3 > 0 ? 'Hạng ' + r.r26_3 : '<span style="color:var(--text-muted); font-weight:normal;">Chưa nhập</span>'}
-           </td>`;
-    }
-
-    let finalBadge = `<span class="badge badge-gray">Thứ ${rank}</span>`;
-    if (rank === 1) finalBadge = `<span class="badge badge-success" style="font-size:0.82rem;">🥇 Xếp Thứ Nhất</span>`;
-    else if (rank === 2) finalBadge = `<span class="badge badge-info" style="font-size:0.82rem;">🥈 Xếp Thứ Nhì</span>`;
-    else if (rank === 3) finalBadge = `<span class="badge badge-warning" style="font-size:0.82rem;">🥉 Xếp Thứ Ba</span>`;
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="text-align:center;">${rankBadge}</td>
-      <td><strong>Chi đoàn ${r.id}</strong></td>
-      <td style="text-align:center;"><span class="badge badge-info">Khối ${r.grade}</span></td>
-      ${monthColsHtml}
-      ${col20_11Html}
-      ${col26_3Html}
-      <td id="cell_sum_rank_${r.id}" style="text-align:center; background:#eff6ff; font-weight:900; font-size:1.1rem; color:var(--primary);">
-        ${r.sumRanks > 0 ? r.sumRanks : '--'}
-      </td>
-      <td style="text-align:center;">${finalBadge}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-function filterMonthlyViewRows() {
-  if (selectedMonthViewKey.startsWith('DETAIL_')) {
-    filterHistoryRows();
-    return;
-  }
-
-  const tbody = document.getElementById('monthlySummaryTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  const isAdminUser = (loggedUser && loggedUser.role === 'admin');
-  const gradeFilter = document.getElementById('historyGradeFilter') ? document.getElementById('historyGradeFilter').value : 'ALL';
-  const q = document.getElementById('historyClassSearch') ? document.getElementById('historyClassSearch').value.trim().toUpperCase() : '';
-
-  const { rows, targetMonths, show20_11, show26_3 } = computeMonthlySummaryRows();
-
-  const filtered = rows.filter(r => {
-    if (gradeFilter !== 'ALL' && r.grade !== gradeFilter) return false;
-    if (q && !r.id.toUpperCase().includes(q)) return false;
-    return true;
-  });
-
-  filtered.forEach((r, idx) => {
-    const rank = idx + 1;
     let rankBadge = `<span class="rank-pill rank-other">${rank}</span>`;
     if (rank === 1) rankBadge = `<span class="rank-pill rank-1">1</span>`;
     else if (rank === 2) rankBadge = `<span class="rank-pill rank-2">2</span>`;
@@ -8048,7 +7986,8 @@ function filterHistoryRows() {
   currentObj.data.forEach((c, idx) => {
     if (idx > 0) {
       const prev = currentObj.data[idx - 1];
-      if (c.rankLabel !== prev.rankLabel || c.totalDeductions !== prev.totalDeductions || c.remainingPenalty !== prev.remainingPenalty) {
+      // Chỉ xét bằng Tổng điểm (remainingPenalty) là xếp đồng hạng
+      if (c.remainingPenalty !== prev.remainingPenalty) {
         currentRank = idx + 1;
       }
     }
@@ -8091,13 +8030,12 @@ function undoSelectedWeekFromDropdown() {
   );
 
   if (idx === -1) {
-    // Nếu tuần đang chọn ở ô trên chưa chốt, kiểm tra xem ở bảng lịch sử bên dưới đang mở kỳ nào để xóa kỳ đó
     const activeList = getFilteredHistoryList(currentHistoryMode);
     const currentObj = activeList[selectedHistoryIndex];
-    if (currentObj && confirm(`ℹ️ [Tuần ${weekNum}] hiện chưa được chốt.\n\nThầy có muốn Xóa / Hoàn tác kỳ đang xem bên dưới là [${currentObj.week}] không?`)) {
+    if (currentObj && currentObj.origIdx !== undefined) {
       deleteHistoryWeek(currentObj.origIdx);
-    } else if (!currentObj) {
-      alert(`ℹ️ Tuần ${weekNum} hiện chưa được chốt nên không cần xóa/hoàn tác!`);
+    } else {
+      alert(`⚠️ Tuần ${weekNum} hiện chưa được chốt nên không thể hoàn tác!`);
     }
     return;
   }
@@ -8105,159 +8043,158 @@ function undoSelectedWeekFromDropdown() {
   deleteHistoryWeek(idx);
 }
 
-function deleteHistoryWeek(originalIdx) {
-  const target = weeklyHistory[originalIdx];
+function deleteHistoryWeek(origIdx) {
+  if (!loggedUser || loggedUser.role !== 'admin') return;
+  const target = weeklyHistory[origIdx];
   if (!target) return;
 
-  const isWeek = (!target.type || target.type === 'WEEK');
-  if (!confirm(`⚠️ Bạn có chắc chắn muốn xóa bản lưu lịch sử của [${target.week}] không?`)) return;
+  if (!confirm(`🗑️ XÁC NHẬN XÓA / HOÀN TÁC KỲ ĐÃ CHỐT:\n\nBạn có chắc chắn muốn xóa bảng chốt [${target.week}] (Ngày chốt: ${target.date}) không?\n- Nếu là Tuần: Các biên bản và dữ liệu SĐB của tuần đó sẽ được mở khóa trở lại.`)) {
+    return;
+  }
 
-  if (isWeek) {
-    const wantRestore = confirm(
-      `🔄 KHÔI PHỤC DỮ LIỆU TUẦN:\n\nBạn có muốn KHÔI PHỤC lại toàn bộ biên bản vi phạm và điểm Sổ đầu bài của [${target.week}] trở về Bảng xếp hạng tuần hiện tại để chấm tiếp không?\n\n- Bấm [OK] để vừa xóa lịch sử, vừa khôi phục điểm về như cũ.\n- Bấm [Hủy / Cancel] nếu chỉ muốn xóa bảng lịch sử này mà vẫn giữ điểm tuần mới ở mức 0.`
-    );
-
-    if (wantRestore) {
+  if (!target.type || target.type === 'WEEK') {
+    const fromD = target.fromDate;
+    const toD = target.toDate;
+    if (fromD && toD) {
       violations.forEach(v => {
-        if (v.archivedWeekId === target.id || (!v.archivedWeekId && v.isArchived)) {
-          v.isArchived = false;
-          delete v.archivedWeekId;
-        }
+        if (v.date >= fromD && v.date <= toD) v.isArchived = false;
       });
-      updateViolationsLocalAndCloud();
-
-      if (target.sdbSnapshot) {
-        Object.keys(target.sdbSnapshot).forEach(cid => {
-          const snap = target.sdbSnapshot[cid];
-          if (sdbFullData[cid] && snap) {
-            sdbFullData[cid].total = snap.total;
-            sdbFullData[cid].good = snap.good;
-            sdbFullData[cid].fair = snap.fair;
-            sdbFullData[cid].medium = snap.medium;
-            sdbFullData[cid].weak = snap.weak;
-            sdbFullData[cid].poor = snap.poor;
-            sdbFullData[cid].goodScores = snap.goodScores;
-            sdbFullData[cid].fairScores = snap.fairScores;
-            sdbFullData[cid].medScores = snap.medScores;
-            sdbFullData[cid].poorScores = snap.poorScores;
-          }
-        });
-      }
       Object.keys(sdbFullData).forEach(cid => {
         (sdbFullData[cid].absences || []).forEach(a => {
-          if (a.archivedWeekId === target.id || (!a.archivedWeekId && a.isArchived)) {
-            a.isArchived = false;
-            delete a.archivedWeekId;
-          }
+          if (a.date >= fromD && a.date <= toD) a.isArchived = false;
         });
       });
-      updateSdbLocalAndCloud();
+    }
+    if (target.sdbSnapshot) {
+      Object.keys(target.sdbSnapshot).forEach(cid => {
+        if (sdbFullData[cid]) {
+          sdbFullData[cid] = {
+            ...sdbFullData[cid],
+            ...target.sdbSnapshot[cid],
+            absences: sdbFullData[cid].absences || []
+          };
+        }
+      });
     }
   }
 
-  weeklyHistory.splice(originalIdx, 1);
-  selectedHistoryIndex = 0;
+  weeklyHistory.splice(origIdx, 1);
   localStorage.setItem('yka_history_v1', JSON.stringify(weeklyHistory));
-  if (typeof syncDataToCloud === 'function') syncDataToCloud("db_history.json", weeklyHistory);
+  localStorage.setItem('yka_violations_v1', JSON.stringify(violations));
+  localStorage.setItem('yka_sdb_full_v1', JSON.stringify(sdbFullData));
 
-  // Bắn tín hiệu trực tiếp cho tất cả các máy Admin/GVCN khác đang mở cập nhật ngay lập tức
+  syncDataToCloud("db_history.json", weeklyHistory);
+  updateViolationsLocalAndCloud();
+  updateSdbLocalAndCloud();
+
   publishUpdate('SYNC_HISTORY_STATE', {
     history: weeklyHistory,
     violations: violations,
     sdb: sdbFullData
   });
 
-  renderLeaderboard();
-  renderStudentSearchTable();
-  renderAlerts();
+  selectedHistoryIndex = 0;
+  populateWeekFinalizeDropdown();
+  initInputWeekSelects();
   renderHistoryTable();
-  alert(`✅ Đã xóa bản chốt [${target.week}] thành công!`);
+  renderLeaderboard();
+  alert(`✅ Đã hoàn tác và xóa kỳ chốt [${target.week}] thành công!`);
 }
 
 function finalizeWeek() {
+  if (!loggedUser || loggedUser.role !== 'admin') {
+    alert('⛔ Chỉ Admin mới có quyền chốt điểm tuần!');
+    return;
+  }
+
   const weekNum = parseInt(document.getElementById('selectWeekToFinalize').value) || 1;
   const fromDate = document.getElementById('finalizeFromDate').value;
   const toDate = document.getElementById('finalizeToDate').value;
 
-  if (!fromDate || !toDate || fromDate > toDate) {
-    alert("⚠️ Vui lòng kiểm tra lại khoảng Từ ngày - Đến ngày của tuần cần chốt!");
+  if (!fromDate || !toDate) {
+    alert('⚠️ Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc tuần!');
     return;
   }
 
-  const weekTitle = `Tuần ${weekNum} (${formatDateVN(fromDate)} - ${formatDateVN(toDate)})`;
+  const weekTitle = `Tuần ${weekNum}`;
+  const subTitle = `Từ ${formatDateVN(fromDate)} đến ${formatDateVN(toDate)}`;
 
   const existingIdx = weeklyHistory.findIndex(h => (!h.type || h.type === 'WEEK') && h.weekNumber === weekNum);
   if (existingIdx !== -1) {
-    if (!confirm(`⚠️ [${weekTitle}] đã từng được chốt trước đó.\nThầy có muốn CẬP NHẬT / GHI ĐÈ lại kết quả của Tuần ${weekNum} không?`)) return;
+    if (!confirm(`⚠️ ${weekTitle} đã từng được chốt trước đó.\nBạn có muốn CẬP NHẬT GHI ĐÈ kết quả mới nhất cho ${weekTitle} không?`)) {
+      return;
+    }
   } else {
-    if (!confirm(`🔒 XÁC NHẬN CHỐT THI ĐUA: ${weekTitle}\n\n- Hệ thống chỉ gom các biên bản vi phạm và lượt nghỉ từ ngày ${formatDateVN(fromDate)} đến ${formatDateVN(toDate)}.\n- Các lỗi phát sinh sau ngày ${formatDateVN(toDate)} (thuộc tuần mới) sẽ được giữ nguyên!\n\nThầy có chắc chắn muốn chốt?`)) return;
+    if (!confirm(`🔒 XÁC NHẬN CHỐT SỔ ${weekTitle.toUpperCase()} (${subTitle}):\n\nSau khi chốt, kết quả sẽ được lưu vào Lịch sử và Sổ đầu bài sẽ chuyển sang tuần mới.`)) {
+      return;
+    }
   }
 
-  const weekId = Date.now();
-
+  // Chụp bản sao dữ liệu SĐB của 36 lớp trong tuần này
   const sdbSnapshot = {};
-  Object.keys(sdbFullData).forEach(cid => {
-    const s = sdbFullData[cid];
-    sdbSnapshot[cid] = {
+  CLASSES.forEach(c => {
+    const s = sdbFullData[c.id] || { total: 30, good: 30, fair: 0, medium: 0, weak: 0, poor: 0, goodScores: 0, gvcnScores: 0, fairScores: 0, medScores: 0, poorScores: 0 };
+    sdbSnapshot[c.id] = {
       total: s.total, good: s.good, fair: s.fair, medium: s.medium, weak: s.weak, poor: s.poor,
-      goodScores: s.goodScores, fairScores: s.fairScores, medScores: s.medScores, poorScores: s.poorScores
+      goodScores: s.goodScores || 0, gvcnScores: s.gvcnScores || 0,
+      fairScores: s.fairScores || 0, medScores: s.medScores || 0, poorScores: s.poorScores || 0,
+      updatedBy: s.updatedBy || '', updatedAt: s.updatedAt || ''
     };
   });
 
-  const newWeekRecord = { 
-    id: weekId, 
+  const dataSnapshot = calculateClassScoresForWeekRange(fromDate, toDate);
+
+  const recordObj = {
     type: 'WEEK',
     weekNumber: weekNum,
+    week: weekTitle,
+    subTitle: subTitle,
     fromDate: fromDate,
     toDate: toDate,
-    week: weekTitle, 
-    subTitle: `Từ ${formatDateVN(fromDate)} đến ${formatDateVN(toDate)}`,
-    date: new Date().toLocaleDateString('vi-VN'), 
-    data: calculateClassScoresForWeekRange(fromDate, toDate),
+    date: new Date().toLocaleDateString('vi-VN'),
+    data: dataSnapshot,
     sdbSnapshot: sdbSnapshot
   };
 
   if (existingIdx !== -1) {
-    weeklyHistory[existingIdx] = newWeekRecord;
+    weeklyHistory[existingIdx] = recordObj;
   } else {
-    weeklyHistory.push(newWeekRecord);
-    weeklyHistory.sort((a, b) => (a.weekNumber || 99) - (b.weekNumber || 99));
+    weeklyHistory.push(recordObj);
   }
 
-  localStorage.setItem('yka_history_v1', JSON.stringify(weeklyHistory));
-  if (typeof syncDataToCloud === 'function') syncDataToCloud("db_history.json", weeklyHistory);
-
-  violations.forEach(v => { 
-    if (v.status === 'Đã duyệt' && !v.isArchived && v.date >= fromDate && v.date <= toDate) {
-      v.isArchived = true; 
-      v.archivedWeekId = weekId;
-    }
+  // Đánh dấu lưu trữ cho các biên bản và lượt nghỉ thuộc khoảng ngày của tuần vừa chốt
+  violations.forEach(v => {
+    if (v.date >= fromDate && v.date <= toDate) v.isArchived = true;
   });
-  updateViolationsLocalAndCloud();
 
-  Object.keys(sdbFullData).forEach(cid => {
-    let s = sdbFullData[cid];
-    s.good = s.total; s.fair = 0; s.medium = 0; s.weak = 0; s.poor = 0;s.isReportedThisWeek = false;
-    s.goodScores = 0; s.fairScores = 0; s.medScores = 0; s.poorScores = 0;
-    if (s.absences) {
-      s.absences.forEach(a => {
-        if (!a.isArchived && a.date >= fromDate && a.date <= toDate) {
-          a.isArchived = true;
-          a.archivedWeekId = weekId;
-        }
+  CLASSES.forEach(c => {
+    if (sdbFullData[c.id]) {
+      (sdbFullData[c.id].absences || []).forEach(a => {
+        if (a.date >= fromDate && a.date <= toDate) a.isArchived = true;
       });
+      // Reset tiết học và điểm số SĐB về mặc định để đón tuần mới
+      sdbFullData[c.id].total = 30;
+      sdbFullData[c.id].good = 30;
+      sdbFullData[c.id].fair = 0;
+      sdbFullData[c.id].medium = 0;
+      sdbFullData[c.id].weak = 0;
+      sdbFullData[c.id].poor = 0;
+      sdbFullData[c.id].goodScores = 0;
+      sdbFullData[c.id].gvcnScores = 0;
+      sdbFullData[c.id].fairScores = 0;
+      sdbFullData[c.id].medScores = 0;
+      sdbFullData[c.id].poorScores = 0;
+      sdbFullData[c.id].isReportedThisWeek = false;
     }
   });
-  updateSdbLocalAndCloud();
 
-  // TỰ ĐỘNG MỞ KHÓA TẤT CẢ 36 CỜ ĐỎ ĐỂ TUẦN MỚI CHỌN LỚP CHẤM CHÉO KHÁC
-  systemUsers.forEach(u => {
-    if (u.role === 'codo') {
-      u.codoLocked = false;
-    }
-  });
-  updateUsersLocalAndCloud();
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
+  localStorage.setItem('yka_history_v1', JSON.stringify(weeklyHistory));
+  localStorage.setItem('yka_violations_v1', JSON.stringify(violations));
+  localStorage.setItem('yka_sdb_full_v1', JSON.stringify(sdbFullData));
+
+  syncDataToCloud("db_history.json", weeklyHistory);
+  updateViolationsLocalAndCloud();
+  updateSdbLocalAndCloud();
 
   publishUpdate('SYNC_HISTORY_STATE', {
     history: weeklyHistory,
@@ -8268,523 +8205,423 @@ function finalizeWeek() {
   currentHistoryMode = 'WEEK';
   selectedHistoryIndex = 0;
   populateWeekFinalizeDropdown();
-  renderLeaderboard();
-  renderStudentSearchTable();
-  renderAlerts();
+  initInputWeekSelects();
   renderHistoryTable();
-  if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
-  alert(`✅ Đã chốt thành công [${weekTitle}]!\n🔓 Hệ thống đã tự động MỞ KHÓA toàn bộ 36 tài khoản Cờ đỏ để các em chọn lớp chấm mới cho tuần tiếp theo!`);
+  renderLeaderboard();
+  alert(`✅ Đã chốt kết quả [${weekTitle}] thành công!`);
 }
-// HÀM DÙNG CHUNG ĐỂ TỔNG HỢP N TUẦN THÀNH BẢNG THÁNG HOẶC BẢNG NĂM HỌC
-function aggregateWeeksData(targetWeeks) {
-  const numWeeks = targetWeeks.length;
-  return CLASSES.map(c => {
-    let totalPen = 0;
-    let counts = { 'Xuất sắc': 0, 'Tốt': 0, 'Khá': 0, 'Đạt': 0, 'Chưa đạt': 0 };
 
-    targetWeeks.forEach(w => {
-      const found = (w.data || []).find(item => item.id === c.id);
+// Hàm gộp dữ liệu từ danh sách các tuần đã chốt để tính cho Tháng / Học kỳ / Cả năm (Thuần túy theo Tổng điểm)
+function aggregateYearOrTermData(weeksList, isFullYear = false) {
+  const list = CLASSES.map(c => {
+    const counts = { 'Xuất sắc': 0, 'Tốt': 0, 'Khá': 0, 'Đạt': 0, 'Chưa đạt': 0 };
+    let sumRemainingPenalty = 0;
+    let sumTotalDeductions = 0;
+    let sumTotalAdditions = 0;
+
+    weeksList.forEach(wObj => {
+      const found = (wObj.data || []).find(item => item.id === c.id);
       if (found) {
-        totalPen += parseFloat(found.remainingPenalty || 0);
         if (counts[found.rankLabel] !== undefined) counts[found.rankLabel]++;
+        sumRemainingPenalty += parseFloat(found.remainingPenalty || 0);
+        sumTotalDeductions += parseFloat(found.totalDeductions || 0);
+        sumTotalAdditions += parseFloat(found.totalAdditions || 0);
       }
     });
 
-    totalPen = parseFloat(totalPen.toFixed(1));
-    const avgPen = totalPen / numWeeks;
+    const netPen = parseFloat(sumRemainingPenalty.toFixed(1));
+    const numWeeks = Math.max(1, weeksList.length);
+    const avgPenPerWeek = netPen / numWeeks;
 
     let rankLabel = 'Xuất sắc', bClass = 'badge-success';
-    if (counts['Chưa đạt'] >= 2 || avgPen > 100) { rankLabel = 'Chưa đạt'; bClass = 'badge-danger'; }
-    else if (counts['Chưa đạt'] === 1 || avgPen > 70) { rankLabel = 'Đạt'; bClass = 'badge-gray'; }
-    else if (avgPen >= 50) { rankLabel = 'Khá'; bClass = 'badge-warning'; }
-    else if (totalPen > 0) { rankLabel = 'Tốt'; bClass = 'badge-info'; }
-    else { rankLabel = 'Xuất sắc'; bClass = 'badge-success'; }
+    if (avgPenPerWeek > 80) {
+      rankLabel = 'Chưa đạt'; bClass = 'badge-danger';
+    } else if (avgPenPerWeek > 50) {
+      rankLabel = 'Đạt'; bClass = 'badge-gray';
+    } else if (avgPenPerWeek > 30) {
+      rankLabel = 'Khá'; bClass = 'badge-warning';
+    } else if (avgPenPerWeek > 0) {
+      rankLabel = 'Tốt'; bClass = 'badge-info';
+    } else {
+      rankLabel = 'Xuất sắc'; bClass = 'badge-success';
+    }
+
+    const weekStatsRaw = `${counts['Xuất sắc']} - ${counts['Tốt']} - ${counts['Khá']} - ${counts['Đạt']} - ${counts['Chưa đạt']}`;
+    const weekStats = `<span style="color:var(--success);">${counts['Xuất sắc']} XS</span> • <span style="color:var(--primary-light);">${counts['Tốt']} T</span> • <span style="color:var(--warning);">${counts['Khá']} K</span> • <span>${counts['Đạt']} Đ</span> • <span style="color:var(--danger);">${counts['Chưa đạt']} CĐ</span>`;
 
     return {
       id: c.id,
       grade: c.grade,
       size: c.size,
-      remainingPenalty: totalPen,
-      weekStats: `<span style="color:var(--success)">${counts['Xuất sắc']} XS</span> / <span style="color:var(--primary-light)">${counts['Tốt']} T</span> / <span style="color:var(--warning)">${counts['Khá']} K</span> / ${counts['Đạt']} Đ / <span style="color:var(--danger)">${counts['Chưa đạt']} CĐ</span>`,
-      weekStatsRaw: `${counts['Xuất sắc']} XS - ${counts['Tốt']} Tốt - ${counts['Khá']} Khá - ${counts['Đạt']} Đạt - ${counts['Chưa đạt']} CĐ`,
-      rankLabel,
-      bClass
+      counts: counts,
+      weekStatsRaw: weekStatsRaw,
+      weekStats: weekStats,
+      totalDeductions: parseFloat(sumTotalDeductions.toFixed(1)),
+      totalAdditions: parseFloat(sumTotalAdditions.toFixed(1)),
+      remainingPenalty: netPen,
+      rankLabel: rankLabel,
+      bClass: bClass
     };
-  }).sort((a, b) => a.remainingPenalty - b.remainingPenalty);
-}
-
-// 2. HÀM CHỐT THÁNG (CHỌN THÁNG & KHOẢNG TUẦN CHÍNH XÁC)
-function finalizeMonth() {
-  const availableWeeks = weeklyHistory.filter(h => !h.type || h.type === 'WEEK');
-  if (availableWeeks.length === 0) {
-    alert("⚠️ Chưa có tuần nào được chốt trong lịch sử! Vui lòng chốt các tuần trong tháng trước khi tổng kết Tháng.");
-    return;
-  }
-
-  const monthName = document.getElementById('selectMonthToFinalize') 
-    ? document.getElementById('selectMonthToFinalize').value 
-    : prompt("Nhập tên Tháng muốn tổng kết:");
-  if (!monthName) return;
-
-  const fromW = parseInt(document.getElementById('monthFromWeekSelect')?.value) || 1;
-  const toW = parseInt(document.getElementById('monthToWeekSelect')?.value) || fromW;
-
-  if (fromW > toW) {
-    alert("⚠️ Tuần bắt đầu không được lớn hơn Tuần kết thúc!");
-    return;
-  }
-
-  // Lọc chính xác các tuần đã chốt nằm trong khoảng [Từ Tuần fromW -> Đến Tuần toW]
-  const targetWeeks = availableWeeks.filter((h, idx) => {
-    const wNum = h.weekNumber || (idx + 1);
-    return wNum >= fromW && wNum <= toW;
   });
 
-  if (targetWeeks.length === 0) {
-    alert(`⚠️ Không tìm thấy dữ liệu tuần nào đã chốt trong khoảng từ Tuần ${fromW} đến Tuần ${toW}!\nThầy vui lòng chốt điểm các tuần này ở mục 1 trước nhé.`);
+  // Sắp xếp thuần túy theo Tổng điểm tích lũy (remainingPenalty nhỏ nhất xếp hạng 1)
+  return list.sort((a, b) => {
+    if (a.remainingPenalty !== b.remainingPenalty) {
+      return a.remainingPenalty - b.remainingPenalty;
+    }
+    return a.id.localeCompare(b.id, undefined, { numeric: true });
+  });
+}
+
+function finalizeMonth() {
+  if (!loggedUser || loggedUser.role !== 'admin') return;
+  const monthName = document.getElementById('selectMonthToFinalize').value;
+  const fromW = parseInt(document.getElementById('monthFromWeekSelect').value) || 1;
+  const toW = parseInt(document.getElementById('monthToWeekSelect').value) || 4;
+
+  if (fromW > toW) {
+    alert('⚠️ Tuần bắt đầu không được lớn hơn tuần kết thúc!');
     return;
   }
 
-  const weekNames = targetWeeks.map(w => `Tuần ${w.weekNumber || w.week}`).join(', ');
+  const matchedWeeks = weeklyHistory.filter(h => 
+    (!h.type || h.type === 'WEEK') && h.weekNumber >= fromW && h.weekNumber <= toW
+  );
 
-  // Kiểm tra xem Tháng này đã từng được chốt chưa để hỏi ghi đè
-  const existingIdx = weeklyHistory.findIndex(h => h.type === 'MONTH' && h.week === monthName);
-  if (existingIdx !== -1) {
-    if (!confirm(`⚠️ Bảng tổng kết [${monthName}] đã tồn tại.\nThầy có muốn CẬP NHẬT / GHI ĐÈ lại bằng dữ liệu gộp từ Tuần ${fromW} đến Tuần ${toW} (${targetWeeks.length} tuần) không?`)) return;
-  } else {
-    if (!confirm(`📆 XÁC NHẬN TỔNG KẾT [${monthName.toUpperCase()}]\n\n- Hệ thống sẽ gộp kết quả của ${targetWeeks.length} tuần đã chốt: (Từ Tuần ${fromW} đến Tuần ${toW}).\n\nThầy có chắc chắn muốn chốt bảng tháng này?`)) return;
+  if (matchedWeeks.length === 0) {
+    alert(`⚠️ Chưa có tuần nào được chốt trong khoảng từ Tuần ${fromW} đến Tuần ${toW}! Vui lòng chốt các tuần trước khi gộp Tháng.`);
+    return;
   }
 
-  const newMonthRecord = {
-    id: Date.now(),
+  const subTitle = `Gộp từ Tuần ${fromW} đến Tuần ${toW} (${matchedWeeks.length} tuần đã chốt)`;
+  if (!confirm(`📆 XÁC NHẬN CHỐT TỔNG KẾT [${monthName.toUpperCase()}]:\n${subTitle}`)) return;
+
+  const aggregated = aggregateYearOrTermData(matchedWeeks, false);
+  const existingIdx = weeklyHistory.findIndex(h => h.type === 'MONTH' && h.week === monthName);
+
+  const monthObj = {
     type: 'MONTH',
     week: monthName,
+    subTitle: subTitle,
     fromWeek: fromW,
     toWeek: toW,
-    subTitle: `Gộp ${targetWeeks.length} tuần (Từ Tuần ${fromW} đến Tuần ${toW})`,
     date: new Date().toLocaleDateString('vi-VN'),
-    data: aggregateWeeksData(targetWeeks)
+    data: aggregated
   };
 
-  if (existingIdx !== -1) {
-    weeklyHistory[existingIdx] = newMonthRecord;
-  } else {
-    weeklyHistory.push(newMonthRecord);
-  }
+  if (existingIdx !== -1) weeklyHistory[existingIdx] = monthObj;
+  else weeklyHistory.push(monthObj);
 
   localStorage.setItem('yka_history_v1', JSON.stringify(weeklyHistory));
-  if (typeof syncDataToCloud === 'function') syncDataToCloud("db_history.json", weeklyHistory);
+  syncDataToCloud("db_history.json", weeklyHistory);
+  publishUpdate('SYNC_HISTORY_STATE', { history: weeklyHistory, violations: violations, sdb: sdbFullData });
 
   currentHistoryMode = 'MONTH';
-  selectedHistoryIndex = 0;
+  selectedMonthViewKey = 'SUMMARY_HK1';
   renderHistoryTable();
-  alert(`🎉 Đã chốt bảng tổng kết [${monthName}] (Gộp từ Tuần ${fromW} đến Tuần ${toW}) thành công!`);
-}
-// 3. HÀM TÍNH XẾP LOẠI HỌC KỲ & CẢ NĂM THEO QUY ĐỊNH KHỐNG CHẾ TUẦN CỦA TRƯỜNG
-function aggregateYearOrTermData(targetWeeks, isFullYear) {
-  const numWeeks = targetWeeks.length;
-  return CLASSES.map(c => {
-    let totalPen = 0;
-    let counts = { 'Xuất sắc': 0, 'Tốt': 0, 'Khá': 0, 'Đạt': 0, 'Chưa đạt': 0 };
-
-    targetWeeks.forEach(w => {
-      const found = (w.data || []).find(item => item.id === c.id);
-      if (found) {
-        totalPen += parseFloat(found.remainingPenalty || 0);
-        if (counts[found.rankLabel] !== undefined) counts[found.rankLabel]++;
-      }
-    });
-
-    totalPen = parseFloat(totalPen.toFixed(1));
-    const totCount = counts['Xuất sắc'] + counts['Tốt'];
-    const khongDatCount = counts['Chưa đạt'];
-
-    let rankLabel = 'Chưa đạt', bClass = 'badge-danger';
-
-    // Áp dụng tỉ lệ theo đúng quy định khống chế tuần của trường (chuẩn 17 tuần cho Học kỳ hoặc 35 tuần cho Cả năm)
-    const scale = isFullYear ? (numWeeks / 35) : (numWeeks / 17);
-
-    if (!isFullYear) {
-      // Quy tắc Học kỳ
-      if (totCount === numWeeks && counts['Khá'] === 0 && counts['Đạt'] === 0 && khongDatCount === 0) {
-        rankLabel = 'Xuất sắc'; bClass = 'badge-success';
-      } else if ((khongDatCount === 0 && totCount >= Math.round(13 * scale)) ||
-                 (khongDatCount === 1 && totCount >= Math.round(15 * scale))) {
-        rankLabel = 'Tốt'; bClass = 'badge-info';
-      } else if ((khongDatCount === 0 && totCount >= Math.round(11 * scale)) ||
-                 (khongDatCount === 1 && totCount >= Math.round(12 * scale)) ||
-                 (khongDatCount === 2 && totCount >= Math.round(14 * scale))) {
-        rankLabel = 'Khá'; bClass = 'badge-warning';
-      } else if ((khongDatCount === 0 && totCount >= Math.round(10 * scale)) ||
-                 (khongDatCount === 1 && totCount >= Math.round(11 * scale)) ||
-                 (khongDatCount === 2 && totCount >= Math.round(12 * scale)) ||
-                 (khongDatCount === 3 && totCount >= Math.round(13 * scale)) ||
-                 (khongDatCount === 4 && totCount >= Math.round(14 * scale))) {
-        rankLabel = 'Đạt'; bClass = 'badge-gray';
-      }
-    } else {
-      // Quy tắc Cả năm học
-      if (totCount === numWeeks && counts['Khá'] === 0 && counts['Đạt'] === 0 && khongDatCount === 0) {
-        rankLabel = 'Xuất sắc'; bClass = 'badge-success';
-      } else if ((khongDatCount === 0 && totCount >= Math.round(26 * scale)) ||
-                 (khongDatCount === 1 && totCount >= Math.round(28 * scale)) ||
-                 (khongDatCount === 2 && totCount >= Math.round(29 * scale)) ||
-                 (khongDatCount === 3 && totCount >= Math.round(30 * scale))) {
-        rankLabel = 'Tốt'; bClass = 'badge-info';
-      } else if ((khongDatCount === 0 && totCount >= Math.round(22 * scale)) ||
-                 (khongDatCount === 1 && totCount >= Math.round(23 * scale)) ||
-                 (khongDatCount === 2 && totCount >= Math.round(24 * scale)) ||
-                 (khongDatCount === 3 && totCount >= Math.round(25 * scale)) ||
-                 (khongDatCount === 4 && totCount >= Math.round(26 * scale))) {
-        rankLabel = 'Khá'; bClass = 'badge-warning';
-      } else if ((khongDatCount === 0 && totCount >= Math.round(20 * scale)) ||
-                 (khongDatCount === 1 && totCount >= Math.round(21 * scale)) ||
-                 (khongDatCount === 2 && totCount >= Math.round(22 * scale)) ||
-                 (khongDatCount === 3 && totCount >= Math.round(23 * scale)) ||
-                 (khongDatCount === 4 && totCount >= Math.round(24 * scale)) ||
-                 (khongDatCount === 5 && totCount >= Math.round(25 * scale)) ||
-                 (khongDatCount === 6 && totCount >= Math.round(26 * scale))) {
-        rankLabel = 'Đạt'; bClass = 'badge-gray';
-      }
-    }
-
-    return {
-      id: c.id,
-      grade: c.grade,
-      size: c.size,
-      remainingPenalty: totalPen,
-      totCount: totCount,
-      khongDatCount: khongDatCount,
-      weekStats: `<span style="color:var(--success)">${counts['Xuất sắc']} XS</span> / <span style="color:var(--primary-light)">${counts['Tốt']} T</span> / <span style="color:var(--warning)">${counts['Khá']} K</span> / ${counts['Đạt']} Đ / <span style="color:var(--danger)">${counts['Chưa đạt']} CĐ</span>`,
-      weekStatsRaw: `${counts['Xuất sắc']} XS - ${counts['Tốt']} Tốt - ${counts['Khá']} Khá - ${counts['Đạt']} Đạt - ${counts['Chưa đạt']} CĐ`,
-      rankLabel,
-      bClass
-    };
-  }).sort((a, b) => {
-    // Ưu tiên xếp hạng theo Danh hiệu Tập thể trước, nếu cùng Danh hiệu thì xét lớp có Tổng điểm trừ tích lũy thấp hơn
-    const rankOrder = { 'Xuất sắc': 5, 'Tốt': 4, 'Khá': 3, 'Đạt': 2, 'Chưa đạt': 1 };
-    if (rankOrder[a.rankLabel] !== rankOrder[b.rankLabel]) {
-      return rankOrder[b.rankLabel] - rankOrder[a.rankLabel];
-    }
-    return a.remainingPenalty - b.remainingPenalty;
-  });
+  alert(`✅ Đã chốt tổng kết [${monthName}] thành công!`);
 }
 
-// HÀM CHỐT HỌC KỲ / CẢ NĂM HỌC (CHỌN KỲ & KHOẢNG TUẦN CHÍNH XÁC)
 function finalizeYearOrTerm() {
-  const availableWeeks = weeklyHistory.filter(h => !h.type || h.type === 'WEEK');
-  if (availableWeeks.length === 0) {
-    alert("⚠️ Chưa có tuần nào được chốt trong lịch sử để tổng kết Học kỳ / Năm học!");
-    return;
-  }
-
-  const termName = document.getElementById('selectYearTermToFinalize')
-    ? document.getElementById('selectYearTermToFinalize').value
-    : prompt("Nhập tên Kỳ tổng kết:");
-  if (!termName) return;
-
-  const fromW = parseInt(document.getElementById('yearFromWeekSelect')?.value) || 1;
-  const toW = parseInt(document.getElementById('yearToWeekSelect')?.value) || 35;
+  if (!loggedUser || loggedUser.role !== 'admin') return;
+  const termName = document.getElementById('selectYearTermToFinalize').value;
+  const fromW = parseInt(document.getElementById('yearFromWeekSelect').value) || 1;
+  const toW = parseInt(document.getElementById('yearToWeekSelect').value) || 18;
 
   if (fromW > toW) {
-    alert("⚠️ Tuần bắt đầu không được lớn hơn Tuần kết thúc!");
+    alert('⚠️ Tuần bắt đầu không được lớn hơn tuần kết thúc!');
     return;
   }
 
-  const targetWeeks = availableWeeks.filter((h, idx) => {
-    const wNum = h.weekNumber || (idx + 1);
-    return wNum >= fromW && wNum <= toW;
-  });
+  const matchedWeeks = weeklyHistory.filter(h => 
+    (!h.type || h.type === 'WEEK') && h.weekNumber >= fromW && h.weekNumber <= toW
+  );
 
-  if (targetWeeks.length === 0) {
-    alert(`⚠️ Không tìm thấy dữ liệu tuần nào đã chốt trong khoảng từ Tuần ${fromW} đến Tuần ${toW}!`);
+  if (matchedWeeks.length === 0) {
+    alert(`⚠️ Chưa có tuần nào được chốt trong khoảng từ Tuần ${fromW} đến Tuần ${toW}!`);
     return;
   }
 
-  const isFullYear = termName.toLowerCase().includes('năm');
+  const isFullYear = (termName === 'Cả Năm Học');
+  const subTitle = `Gộp từ Tuần ${fromW} đến Tuần ${toW} (${matchedWeeks.length} tuần đã chốt)`;
+  if (!confirm(`🎓 XÁC NHẬN CHỐT TỔNG KẾT [${termName.toUpperCase()}]:\n${subTitle}`)) return;
 
+  const aggregated = aggregateYearOrTermData(matchedWeeks, isFullYear);
   const existingIdx = weeklyHistory.findIndex(h => h.type === 'YEAR' && h.week === termName);
-  if (existingIdx !== -1) {
-    if (!confirm(`⚠️ Bảng tổng kết [${termName}] đã tồn tại.\nThầy có muốn CẬP NHẬT / GHI ĐÈ lại bằng dữ liệu gộp từ Tuần ${fromW} đến Tuần ${toW} (Tổng ${targetWeeks.length} tuần đã chốt) không?`)) return;
-  } else {
-    if (!confirm(`🎓 XÁC NHẬN TỔNG KẾT [${termName.toUpperCase()}]\n\n- Hệ thống sẽ tổng hợp dữ liệu của ${targetWeeks.length} tuần đã chốt (Từ Tuần ${fromW} đến Tuần ${toW}).\n- Áp dụng quy tắc khống chế số tuần để xếp hạng Tập thể.\n\nThầy có chắc chắn muốn lưu bảng tổng kết này?`)) return;
-  }
 
-  const newYearRecord = {
-    id: Date.now(),
+  const yearObj = {
     type: 'YEAR',
     week: termName,
+    subTitle: subTitle,
     fromWeek: fromW,
     toWeek: toW,
-    subTitle: `Tổng hợp ${targetWeeks.length} tuần (Từ Tuần ${fromW} đến Tuần ${toW})`,
     date: new Date().toLocaleDateString('vi-VN'),
-    data: aggregateYearOrTermData(targetWeeks, isFullYear)
+    data: aggregated
   };
 
-  if (existingIdx !== -1) {
-    weeklyHistory[existingIdx] = newYearRecord;
-  } else {
-    weeklyHistory.push(newYearRecord);
-  }
+  if (existingIdx !== -1) weeklyHistory[existingIdx] = yearObj;
+  else weeklyHistory.push(yearObj);
 
   localStorage.setItem('yka_history_v1', JSON.stringify(weeklyHistory));
-  if (typeof syncDataToCloud === 'function') syncDataToCloud("db_history.json", weeklyHistory);
+  syncDataToCloud("db_history.json", weeklyHistory);
+  publishUpdate('SYNC_HISTORY_STATE', { history: weeklyHistory, violations: violations, sdb: sdbFullData });
 
   currentHistoryMode = 'YEAR';
   selectedHistoryIndex = 0;
   renderHistoryTable();
-  alert(`🎓 Đã chốt bảng tổng kết [${termName}] (Từ Tuần ${fromW} đến Tuần ${toW}) thành công!`);
+  if (typeof renderHk1ClassTable === 'function') renderHk1ClassTable();
+  alert(`✅ Đã chốt tổng kết [${termName}] thành công!`);
 }
-// 4. HÀM XUẤT EXCEL CHO CẢ TUẦN / THÁNG / NĂM ĐANG XEM
+
 function exportHistoryCSV() {
   const activeList = getFilteredHistoryList(currentHistoryMode);
   const currentObj = activeList[selectedHistoryIndex];
   if (!currentObj) return;
 
-  let csv = currentHistoryMode !== 'WEEK'
-    ? "\uFEFFHạng,Chi đoàn,Khối,Sĩ số,Thống kê các tuần,Tổng điểm trừ tích lũy,Xếp loại\n"
-    : "\uFEFFHạng,Chi đoàn,Khối,Sĩ số,Điểm trừ còn lại (Sau bù),Xếp loại Tuần\n";
-
-  currentObj.data.forEach((c, idx) => {
+  let csv = "\uFEFFHạng,Chi đoàn,Khối,Sĩ số,Điểm trừ còn lại (Sau bù),Xếp loại\n";
+  let currentRank = 1;
+  (currentObj.data || []).forEach((c, idx) => {
+    if (idx > 0 && c.remainingPenalty !== currentObj.data[idx - 1].remainingPenalty) {
+      currentRank = idx + 1;
+    }
     const cGrade = c.grade || (c.id.startsWith('10') ? '10' : (c.id.startsWith('11') ? '11' : '12'));
     const penStr = c.remainingPenalty <= 0 ? `+${Math.abs(c.remainingPenalty)}` : `-${c.remainingPenalty}`;
-    if (currentHistoryMode !== 'WEEK') {
-      csv += `${idx + 1},Chi đoàn ${c.id},${cGrade},${c.size},"${c.weekStatsRaw || ''}",${penStr},${c.rankLabel}\n`;
-    } else {
-      csv += `${idx + 1},Chi đoàn ${c.id},${cGrade},${c.size},${penStr},${c.rankLabel}\n`;
-    }
+    csv += `${currentRank},Chi đoàn ${c.id},${cGrade},${c.size || ''},${penStr},${c.rankLabel}\n`;
   });
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `Ket_Qua_Thi_Dua_${currentObj.week.replace(/\s+/g, '_')}_YKA.csv`;
+  a.download = `Lich_Su_Thi_Dua_${currentObj.week.replace(/\s+/g, '_')}_YKA.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 }
-// Thuật toán băm SHA-256 (Mã hóa một chiều không thể dịch ngược)
-async function sha256Hash(text) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+
+// ================= CÁC HÀM TIỆN ÍCH HỆ THỐNG, CHỌN TUẦN NHẬP LIỆU, ĐỔI MẬT KHẨU & SAO LƯU =================
+
+function initInputWeekSelects() {
+  const startStr = getWeek1StartDate();
+  const baseDate = new Date(startStr + 'T00:00:00');
+  if (isNaN(baseDate.getTime())) return;
+
+  const todayStr = toLocalYMD(new Date());
+  let activeWeek = 1;
+  let foundByDate = false;
+
+  const weekOptions = [];
+  for (let w = 1; w <= 35; w++) {
+    const dFrom = new Date(baseDate);
+    dFrom.setDate(baseDate.getDate() + (w - 1) * 7);
+    const dTo = new Date(dFrom);
+    dTo.setDate(dFrom.getDate() + 6);
+
+    const fromYMD = toLocalYMD(dFrom);
+    const toYMD = toLocalYMD(dTo);
+    const isFinalized = weeklyHistory.some(h => (!h.type || h.type === 'WEEK') && h.weekNumber === w);
+
+    if (todayStr >= fromYMD && todayStr <= toYMD) {
+      activeWeek = w;
+      foundByDate = true;
+    }
+
+    weekOptions.push({
+      w, fromYMD, toYMD, isFinalized,
+      label: `Tuần ${w} (${formatDateVN(fromYMD)} - ${formatDateVN(toYMD)}) ${isFinalized ? '🔒 [Đã chốt]' : '🟢 [Đang mở nhập]'}`
+    });
+  }
+
+  if (!foundByDate) {
+    const firstOpen = weekOptions.find(o => !o.isFinalized);
+    if (firstOpen) activeWeek = firstOpen.w;
+  }
+
+  ['sdb', 'codo', 'tnxk'].forEach(roleKey => {
+    const sel = document.getElementById(`inputWeekSelect_${roleKey}`);
+    if (!sel) return;
+    const prevVal = sel.value;
+    sel.innerHTML = '';
+    weekOptions.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.w;
+      opt.dataset.from = o.fromYMD;
+      opt.dataset.to = o.toYMD;
+      opt.dataset.finalized = o.isFinalized ? 'true' : 'false';
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+    sel.value = prevVal || activeWeek;
+  });
+}
+
+function onInputWeekChange(roleKey) {
+  const sel = document.getElementById(`inputWeekSelect_${roleKey}`);
+  if (!sel || !sel.selectedOptions[0]) return;
+  const opt = sel.selectedOptions[0];
+  const fromD = opt.dataset.from;
+  const toD = opt.dataset.to;
+  const todayStr = toLocalYMD(new Date());
+  const defaultDate = (todayStr >= fromD && todayStr <= toD) ? todayStr : fromD;
+
+  if (roleKey === 'sdb') {
+    const dInp = document.getElementById('sdbAbsenceDate');
+    if (dInp) dInp.value = defaultDate;
+    setupSdbForm();
+  } else if (roleKey === 'codo') {
+    const dInp = document.getElementById('codoDateInput');
+    if (dInp) dInp.value = defaultDate;
+    renderCodoLogsTable();
+  } else if (roleKey === 'tnxk') {
+    const dInp = document.getElementById('tnxkDateInput');
+    if (dInp) dInp.value = defaultDate;
+    renderTnxkLogsTable();
+  }
+}
+
+async function sha256Hash(str) {
+  const buf = new TextEncoder().encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function syncDataForParents() {
-  if (!loggedUser || loggedUser.role !== 'admin') {
-    alert('⛔ Chỉ Bí thư / Admin mới có quyền đồng bộ dữ liệu này!');
-    return;
-  }
-  const btn = document.getElementById('btnSyncParent');
-  const oldText = btn.innerHTML;
-  btn.innerHTML = "⏳ Đang gửi dữ liệu...";
-  btn.disabled = true;
-
-  try {
-    const records = computeHk1StudentRecords(); 
-    const exportData = [];
-    // Bổ sung 2 cột: Nghi_Co_Phep và Nghi_Khong_Phep (Tổng cộng 7 cột)
-    exportData.push(["Hash_Key", "Ho_Ten", "Diem_Ren_Luyen", "Xep_Loai", "Chi_Tiet_Loi", "Nghi_Co_Phep", "Nghi_Khong_Phep"]);
-
-    for (let r of records) {
-      const rawKey = String(r.id).trim().toLowerCase().replace(/\s/g, '');
-      const hashedKey = await sha256Hash(rawKey); 
-      const cleanDetails = r.details.length > 0 ? r.details.join(' | ').replace(/,/g, ' ') : "Tốt, Không có vi phạm nào.";
-      
-      // Đẩy thêm số buổi nghỉ có phép và không phép vào mảng
-      exportData.push([
-        hashedKey, 
-        r.name, 
-        r.finalScore, 
-        r.rank, 
-        cleanDetails, 
-        r.excusedAbsences || 0, 
-        r.unexcusedAbsences || 0
-      ]);
-    }
-
-    await fetch(MASTER_APP_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors', 
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(attachAuthCredentials({ action: "sync_phuhuynh", data: exportData }))
-    });
-
-    alert('✅ ĐÃ ĐỒNG BỘ THÀNH CÔNG LÊN GOOGLE SHEETS!\nDữ liệu (kèm số buổi nghỉ học) đã được cập nhật cho Phụ huynh.');
-
-  } catch (error) {
-    alert('❌ Lỗi kết nối: ' + error.message);
-  } finally {
-    btn.innerHTML = oldText;
-    btn.disabled = false;
-  }
-}
-// ==================== BẢO MẬT: BẮT BUỘC ĐỔI MẬT KHẨU LẦN ĐẦU & ĐỔI MK CÁ NHÂN ====================
 function isUsingDefaultPatternPass(user) {
-  if (!user || user.role === 'guest') return false;
+  if (!user || !user.username || user.role === 'admin' || user.role === 'guest') return false;
   if (user.mustChangePass === true) return true;
-  if (user.mustChangePass === false) return false;
-
-  const p = (user.pass || '').trim().toLowerCase();
-  const u = (user.username || '').trim().toLowerCase();
-
-  // Nhận diện toàn bộ mật khẩu mặc định theo quy luật: sdb@10a1, codo@10a1, tnxk@1, 123456...
-  const defaultPattern = u.replace('_', '@');
-  if (
-    p === defaultPattern ||
-    p === '123456' ||
-    p.startsWith('sdb@') ||
-    p.startsWith('codo@') ||
-    p.startsWith('tnxk@')
-  ) {
-    return true;
-  }
-  if (
-    p === defaultPattern ||
-    p === '123456' ||
-    p.startsWith('sdb@') ||
-    p.startsWith('codo@') ||
-    p.startsWith('tnxk@') ||
-    p.startsWith('gvcn@')
-  ) {
-    return true;
-  }
-  return false;
+  const expectedDefault = user.username.trim().toLowerCase().replace('_', '@');
+  return (user.pass === expectedDefault || user.pass === '123456');
 }
 
-function openChangePassModal(isForced) {
+function openChangePassModal(isForced = false) {
   if (!loggedUser || loggedUser.role === 'guest') return;
-  const modal = document.getElementById('changePassModal');
-  const desc = document.getElementById('changePassDesc');
-  const btnCancel = document.getElementById('btnCancelChangePass');
-
   document.getElementById('cpUsernameDisplay').value = `${loggedUser.username} (${loggedUser.name})`;
   document.getElementById('cpOldPass').value = '';
   document.getElementById('cpNewPass').value = '';
   document.getElementById('cpConfirmPass').value = '';
 
+  const btnCancel = document.getElementById('btnCancelChangePass');
+  const desc = document.getElementById('changePassDesc');
   if (isForced) {
-    // Chế độ bắt buộc: Ẩn nút Đóng để học sinh không thể bỏ qua
-    btnCancel.style.display = 'none';
-    desc.style.display = 'block';
+    if (btnCancel) btnCancel.style.display = 'none';
+    if (desc) desc.style.display = 'block';
   } else {
-    // Chế độ chủ động bấm nút Đổi MK trên Header: Cho phép bấm Đóng
-    btnCancel.style.display = 'inline-flex';
-    desc.style.display = 'none';
+    if (btnCancel) btnCancel.style.display = 'inline-flex';
+    if (desc) desc.style.display = 'none';
   }
 
-  modal.style.display = 'flex';
+  document.getElementById('changePassModal').style.display = 'flex';
 }
 
 async function handleSelfPasswordChange(e) {
   e.preventDefault();
-  if (!loggedUser || loggedUser.role === 'guest') return;
+  if (!loggedUser) return;
 
-  const oldPass = document.getElementById('cpOldPass').value.trim();
-  const newPass = document.getElementById('cpNewPass').value.trim();
-  const confirmPass = document.getElementById('cpConfirmPass').value.trim();
+  const oldP = document.getElementById('cpOldPass').value.trim();
+  const newP = document.getElementById('cpNewPass').value.trim();
+  const confirmP = document.getElementById('cpConfirmPass').value.trim();
 
-  // Ưu tiên lấy mật khẩu thật của phiên vừa đăng nhập (loggedUser.pass) vì userRecord.pass đã bị làm rỗng để chống F12
-  const userRecord = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
-  const currentActualPass = (loggedUser && loggedUser.pass) ? loggedUser.pass : (userRecord ? userRecord.pass : '');
-
-  if (oldPass !== currentActualPass) {
+  if (oldP !== loggedUser.pass) {
     alert('❌ Mật khẩu hiện tại không chính xác!');
     return;
   }
-
-  if (newPass.length < 6) {
+  if (newP.length < 6) {
     alert('⚠️ Mật khẩu mới phải có ít nhất 6 ký tự!');
     return;
   }
-
-  if (newPass !== confirmPass) {
+  if (newP !== confirmP) {
     alert('❌ Mật khẩu mới nhập lại không khớp!');
     return;
   }
-
-  const tempCheckUser = { ...loggedUser, pass: newPass, mustChangePass: undefined };
-  if (newPass === oldPass || isUsingDefaultPatternPass(tempCheckUser)) {
-    alert('⚠️ Mật khẩu mới vẫn trùng với mật khẩu mặc định hoặc quy luật chung (`sdb@...`, `codo@...`, `123456`). Vui lòng đặt mật khẩu riêng bí mật hơn!');
+  const defaultPattern = loggedUser.username.trim().toLowerCase().replace('_', '@');
+  if (newP.toLowerCase() === defaultPattern || newP === '123456') {
+    alert('⚠️ Không được đặt lại mật khẩu trùng với mật khẩu mặc định ban đầu!');
     return;
   }
 
-  const btn = document.getElementById('btnSubmitChangePass');
-  const oldText = btn.innerHTML;
-  btn.innerHTML = '⏳ Đang đồng bộ mật khẩu...';
-  btn.disabled = true;
+  loggedUser.pass = newP;
+  loggedUser.mustChangePass = false;
+  sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
 
+  const uObj = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
+  if (uObj) {
+    uObj.pass = newP;
+    uObj.mustChangePass = false;
+  }
+
+  await updateSinglePassToCloud(loggedUser.username, newP, oldP);
+  publishUpdate('UPDATE_USER_PASS', { username: loggedUser.username, newPass: newP });
+
+  document.getElementById('changePassModal').style.display = 'none';
+  alert('✅ Đã đổi mật khẩu bảo mật thành công!');
+}
+
+async function forceMobileRefresh() {
+  const btn = document.getElementById('btnMobileRefresh');
+  const oldHtml = btn ? btn.innerHTML : '🔄 Làm mới';
+  if (btn) {
+    btn.innerHTML = '⏳ Đang tải...';
+    btn.disabled = true;
+  }
   try {
-    // 1. Gửi lệnh đổi mật khẩu lên Google Drive TRƯỚC (kèm theo oldPass để Server xác thực chuẩn xác)
-    await updateSinglePassToCloud(loggedUser.username, newPass, oldPass);
-
-    // 2. Sau khi gửi xong mới cập nhật mật khẩu mới vào phiên đăng nhập hiện tại
-    const latestUserRecord = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
-    if (latestUserRecord) {
-      latestUserRecord.pass = newPass;
-      latestUserRecord.mustChangePass = false;
-    }
-
-    loggedUser.pass = newPass;
-    loggedUser.mustChangePass = false;
-    sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
-    localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-
-    // 3. Bắn tín hiệu MQTT sang máy Admin
-    publishUpdate('UPDATE_USER_PASS', {
-      username: loggedUser.username,
-      newPass: newPass
-    });
-
-    if (loggedUser.role === 'admin' && typeof renderAdminUsersTable === 'function') {
-      renderAdminUsersTable();
-    }
-
-    document.getElementById('changePassModal').style.display = 'none';
-    alert('✅ Đổi mật khẩu thành công! Mật khẩu mới đã được đồng bộ lên hệ thống.');
+    await fetchDatabaseFromCloud(true);
+    alert('✅ Đã cập nhật dữ liệu mới nhất từ Đám mây!');
   } finally {
-    btn.innerHTML = oldText;
-    btn.disabled = false;
+    if (btn) {
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
   }
 }
-// ==================== SAO LƯU & KHÔI PHỤC TOÀN HỆ THỐNG (FULL BACKUP & RESTORE) ====================
+
+async function syncDataForParents() {
+  const btn = document.getElementById('btnSyncParent');
+  const oldText = btn ? btn.innerHTML : '☁️ Đồng bộ Cổng Phụ Huynh';
+  if (btn) {
+    btn.innerHTML = '⏳ Đang đồng bộ...';
+    btn.disabled = true;
+  }
+  try {
+    await syncDataToCloud("db_violations.json", violations);
+    await syncDataToCloud("db_sdb.json", sdbFullData);
+    alert('✅ Đã đồng bộ dữ liệu mới nhất lên Cổng tra cứu Phụ huynh!');
+  } finally {
+    if (btn) {
+      btn.innerHTML = oldText;
+      btn.disabled = false;
+    }
+  }
+}
+
 function exportFullSystemBackup() {
   if (!loggedUser || loggedUser.role !== 'admin') {
-    alert('⛔ Chỉ Bí thư / Admin mới có quyền tải file sao lưu toàn hệ thống!');
+    alert('⛔ Chỉ Admin mới có quyền tải bản sao lưu toàn hệ thống!');
     return;
   }
-
-  const backupPackage = {
-    backupDate: new Date().toLocaleString('vi-VN'),
-    school: "THPT YÊN KHÁNH A",
+  const backupObj = {
+    backupDate: new Date().toISOString(),
     students: STUDENTS_DB,
-    users: systemUsers,
     rules: RULES,
     tabs: TABS_CONFIG,
-    violations: violations,
+    conductConfig: CONDUCT_CONFIG,
+    users: systemUsers,
     sdb: sdbFullData,
+    violations: violations,
     history: weeklyHistory
   };
-
-  const jsonStr = JSON.stringify(backupPackage, null, 2);
-  const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
-  const todayStr = new Date().toISOString().split('T')[0];
-  const a = document.createElement("a");
+  const blob = new Blob([JSON.stringify(backupObj, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `SAO_LUU_THI_DUA_YKA_${todayStr}.json`;
+  a.download = `Sao_Luu_He_Thong_Thi_Dua_YKA_${toLocalYMD(new Date())}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 }
 
-async function importFullSystemBackup(event) {
+function importFullSystemBackup(event) {
   if (!loggedUser || loggedUser.role !== 'admin') {
-    alert('⛔ Chỉ Bí thư / Admin mới có quyền khôi phục dữ liệu hệ thống!');
+    alert('⛔ Chỉ Admin mới có quyền khôi phục dữ liệu hệ thống!');
     return;
   }
-
   const file = event.target.files[0];
   if (!file) return;
 
@@ -8792,184 +8629,59 @@ async function importFullSystemBackup(event) {
   reader.onload = async function(e) {
     try {
       const data = JSON.parse(e.target.result);
-      if (!data.users || !data.violations || !data.sdb) {
-        alert('❌ File sao lưu không đúng định dạng của Hệ thống Thi đua Yên Khánh A!');
+      if (!confirm('⚠️ XÁC NHẬN KHÔI PHỤC DỮ LIỆU:\n\nToàn bộ dữ liệu trên máy và trên Google Drive sẽ được khôi phục theo file sao lưu này. Bạn có chắc chắn muốn tiếp tục?')) {
         return;
       }
 
-      if (!confirm(`♻️ XÁC NHẬN KHÔI PHỤC DỮ LIỆU\n\nBản sao lưu ngày: ${data.backupDate || 'Không rõ'}\n- Số học sinh: ${(data.students || []).length}\n- Số tài khoản: ${(data.users || []).length}\n- Số biên bản: ${(data.violations || []).length}\n- Số kỳ lịch sử: ${(data.history || []).length}\n\nBạn có chắc chắn muốn nạp lại toàn bộ dữ liệu này và đồng bộ lên Google Drive không?`)) {
-        event.target.value = '';
-        return;
-      }
-
-      // 1. Khôi phục vào bộ nhớ máy tính
-      if (data.students && data.students.length > 0) {
+      if (Array.isArray(data.students)) {
         STUDENTS_DB = data.students;
         localStorage.setItem('yka_students_db_v1', JSON.stringify(STUDENTS_DB));
-        CLASSES = getDynamicClasses();
       }
-      if (data.users) {
-        systemUsers = data.users;
-        localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-      }
-      if (data.rules) {
+      if (Array.isArray(data.rules)) {
         RULES = data.rules;
         localStorage.setItem('yka_rules_v1', JSON.stringify(RULES));
+        await syncDataToCloud("db_rules.json", RULES);
       }
       if (data.tabs) {
         TABS_CONFIG = data.tabs;
         localStorage.setItem('yka_tabs_config_v1', JSON.stringify(TABS_CONFIG));
+        await syncDataToCloud("db_tabs.json", TABS_CONFIG);
       }
-      if (data.violations) {
-        violations = data.violations;
-        localStorage.setItem('yka_violations_v1', JSON.stringify(violations));
+      if (data.conductConfig) {
+        CONDUCT_CONFIG = data.conductConfig;
+        localStorage.setItem('yka_conduct_config_v1', JSON.stringify(CONDUCT_CONFIG));
+      }
+      if (Array.isArray(data.users)) {
+        systemUsers = data.users;
+        localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+        await syncDataToCloud("db_users.json", systemUsers);
       }
       if (data.sdb) {
         sdbFullData = data.sdb;
         localStorage.setItem('yka_sdb_full_v1', JSON.stringify(sdbFullData));
+        await syncDataToCloud("db_sdb.json", sdbFullData);
       }
-      if (data.history) {
+      if (Array.isArray(data.violations)) {
+        violations = data.violations;
+        localStorage.setItem('yka_violations_v1', JSON.stringify(violations));
+        await syncDataToCloud("db_violations.json", violations);
+      }
+      if (Array.isArray(data.history)) {
         weeklyHistory = data.history;
         localStorage.setItem('yka_history_v1', JSON.stringify(weeklyHistory));
+        await syncDataToCloud("db_history.json", weeklyHistory);
       }
 
-      // 2. Đẩy toàn bộ ngược lên Google Drive để phục hồi các file đã mất
-      updateUsersLocalAndCloud();
-      await syncDataToCloud("db_rules.json", RULES);
-      await syncDataToCloud("db_tabs.json", TABS_CONFIG);
-      await syncDataToCloud("db_violations.json", violations);
-      await syncDataToCloud("db_sdb.json", sdbFullData);
-      await syncDataToCloud("db_history.json", weeklyHistory);
-
-      alert('✅ KHÔI PHỤC THÀNH CÔNG 100%!\nToàn bộ dữ liệu trên máy và trên Google Drive đã được phục hồi nguyên vẹn.');
+      alert('✅ Đã khôi phục toàn bộ dữ liệu hệ thống thành công! Trang web sẽ tự tải lại.');
       location.reload();
     } catch (err) {
-      alert('❌ Lỗi đọc file sao lưu: ' + err.message);
+      alert('❌ File sao lưu không hợp lệ hoặc bị lỗi cấu trúc: ' + err.message);
+    } finally {
+      event.target.value = '';
     }
-    event.target.value = '';
   };
   reader.readAsText(file);
 }
-// ==================== ĐỒNG BỘ ĐA THIẾT BỊ CHO ADMIN (CHỐNG GHI ĐÈ DỮ LIỆU CŨ) ====================
-// Tự động kéo dữ liệu mới nhất từ Google Drive mỗi khi thầy mở lại tab trình duyệt hoặc bật máy tính lên
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    fetchDatabaseFromCloud();
-    if (!mqttClient || !mqttClient.connected) connectMqtt();
-  }
-});
-
-window.addEventListener('focus', () => {
-  fetchDatabaseFromCloud();
-});
-// --- BẮT ĐẦU: Hàm xử lý nút Làm mới thủ công trên Mobile ---
-async function forceMobileRefresh() {
-  const btn = document.getElementById('btnMobileRefresh');
-  if (btn) {
-    btn.innerHTML = "⏳ Đang tải...";
-    btn.disabled = true;
-    btn.style.opacity = "0.7";
-  }
-
-  try {
-    // Ép tải lại dữ liệu từ Đám mây (truyền tham số true để bỏ qua độ trễ 5 giây)
-    await fetchDatabaseFromCloud(true);
-    
-    if (btn) {
-      btn.innerHTML = "✅ Đã chốt số liệu";
-      btn.style.backgroundColor = "var(--success)";
-      btn.style.borderColor = "var(--success)";
-      
-      // Trả lại trạng thái cũ sau 2 giây
-      setTimeout(() => {
-        btn.innerHTML = "🔄 Làm mới";
-        btn.disabled = false;
-        btn.style.opacity = "1";
-        btn.style.backgroundColor = "rgba(255,255,255,0.25)";
-        btn.style.borderColor = "rgba(255,255,255,0.5)";
-      }, 2000);
-    }
-  } catch (error) {
-    if (btn) {
-      btn.innerHTML = "❌ Lỗi mạng";
-      btn.style.backgroundColor = "var(--danger)";
-      setTimeout(() => {
-        btn.innerHTML = "🔄 Thử lại";
-        btn.disabled = false;
-        btn.style.opacity = "1";
-        btn.style.backgroundColor = "rgba(255,255,255,0.25)";
-      }, 2000);
-    }
-  }
-}
-// HÀM 1: Nạp danh sách 35 Tuần vào 3 ô Chọn Tuần vừa tạo
-function initInputWeekSelects() {
-  const selects = ['inputWeekSelect_sdb', 'inputWeekSelect_codo', 'inputWeekSelect_tnxk'];
-  const startStr = (typeof getWeek1StartDate === 'function') ? getWeek1StartDate() : (localStorage.getItem('yka_week1_start') || '2026-09-07');
-  const baseDate = new Date(startStr + 'T00:00:00');
-  if (isNaN(baseDate.getTime())) return;
-
-  let optionsHtml = '';
-  const todayStr = new Date().toISOString().split('T')[0];
-  let activeWeek = 1;
-
-  for (let w = 1; w <= 35; w++) {
-    const dFrom = new Date(baseDate);
-    dFrom.setDate(baseDate.getDate() + (w - 1) * 7);
-    const dTo = new Date(dFrom);
-    dTo.setDate(dFrom.getDate() + 6);
-
-    const fromYMD = dFrom.toISOString().split('T')[0];
-    const toYMD = dTo.toISOString().split('T')[0];
-    const fmtFrom = `${fromYMD.split('-')[2]}/${fromYMD.split('-')[1]}/${fromYMD.split('-')[0]}`;
-    const fmtTo = `${toYMD.split('-')[2]}/${toYMD.split('-')[1]}/${toYMD.split('-')[0]}`;
-
-    // Kiểm tra tuần này Admin đã bấm chốt chưa
-    const isFinalized = weeklyHistory.some(h => (!h.type || h.type === 'WEEK') && (h.weekNumber === w || (h.week && h.week.includes(`Tuần ${w}`))));
-    if (todayStr >= fromYMD && todayStr <= toYMD) activeWeek = w;
-
-    optionsHtml += `<option value="${w}" data-from="${fromYMD}" data-to="${toYMD}" data-finalized="${isFinalized}">📅 Tuần ${w} (${fmtFrom} - ${fmtTo}) ${isFinalized ? '✅ [Đã chốt]' : ''}</option>`;
-  }
-
-  selects.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      const currentVal = el.value;
-      el.innerHTML = optionsHtml;
-      el.value = currentVal || activeWeek;
-    }
-  });
-}
-
-// HÀM 2: Xử lý khi người dùng chọn một tuần bất kỳ
-function onInputWeekChange(type) {
-  const sel = document.getElementById(`inputWeekSelect_${type}`);
-  if (!sel || !sel.selectedOptions[0]) return;
-  const opt = sel.selectedOptions[0];
-  const isFinalized = opt.dataset.finalized === 'true';
-  const fromDate = opt.dataset.from;
-
-  if (isFinalized) {
-    alert(`⚠️ TUẦN NÀY ĐÃ ĐƯỢC ADMIN CHỐT SỔ!\n\nĐể sửa dữ liệu của tuần này, bạn hãy nhờ Admin vào tab [Lịch Sử] bấm [Hoàn tác] tuần này ra trước. Nếu cố tình nhập, dữ liệu sẽ bị lệch!`);
-  }
-
-  // Tự động nhảy ngày ghi nhận về Thứ 2 của tuần được chọn
-  if (type === 'codo') {
-    const dInp = document.getElementById('codoDateInput');
-    if(dInp) dInp.value = fromDate;
-    if(typeof renderCodoLogsTable === 'function') renderCodoLogsTable();
-  } else if (type === 'tnxk') {
-    const dInp = document.getElementById('tnxkDateInput');
-    if(dInp) dInp.value = fromDate;
-    if(typeof renderTnxkLogsTable === 'function') renderTnxkLogsTable();
-  } else if (type === 'sdb') {
-    const dInp = document.getElementById('sdbAbsenceDate');
-    if(dInp) dInp.value = fromDate;
-    if(typeof setupSdbForm === 'function') setupSdbForm(); // Gọi lại toàn bộ form để nạp số liệu cũ
-  }
-}
-
 </script>
-<datalist id="studentDatalist"></datalist>
 </body>
 </html>
