@@ -237,6 +237,7 @@
   .btn-danger { background: var(--danger-bg); color: var(--danger); }
   .btn-danger:hover { background: #fecaca; }
   .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.78rem; border-radius: 6px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(40%); }
 
   /* Tables */
   .table-responsive { overflow-x: auto; max-width: 100%; border-radius: 8px; border: 1px solid var(--border-light); }
@@ -2268,7 +2269,14 @@ async function fetchDatabaseFromCloud(force = false) {
       }
     }
     // ======================= KẾT THÚC BẢO VỆ CẤU HÌNH =======================
-
+    // ĐỒNG BỘ PHÂN CÔNG CỜ ĐỎ ĐỘC LẬP (CHỐNG DRIVE ĐÈ NGƯỢC TRONG 25 GIÂY SAU KHI CHỐT)
+    const lastCodoSave = parseInt(localStorage.getItem('yka_last_codo_save') || '0', 10);
+    if (db.codoAssign && typeof db.codoAssign === 'object' && (Date.now() - lastCodoSave > 25000)) {
+      codoAssignMap = db.codoAssign;
+      localStorage.setItem('yka_codo_assign_v1', JSON.stringify(codoAssignMap));
+    }
+    applyCodoAssignMapToSystemUsers();
+    syncLoggedUserCodoScope();
     // BẢO VỆ THÔNG MINH CHO CỜ ĐỎ
     if (db.violations && Array.isArray(db.violations)) {
       if (violations.length === 0) {
@@ -2314,9 +2322,9 @@ function renderCodoAssignTable() {
   const codoUsers = systemUsers.filter(u => u.role === 'codo');
   codoUsers.forEach((u, idx) => {
     const realIdx = systemUsers.indexOf(u); 
-    const homeClass = u.username.replace('codo_', '').toUpperCase();
-    const currentAssigned = (u.scope && u.scope[0]) ? String(u.scope[0]).toUpperCase() : '';
-    const isLocked = (u.codoLocked === true && currentAssigned !== '' && currentAssigned !== homeClass);
+    const info = getCodoAssignInfo(u.username);
+    const currentAssigned = (info.scope && info.scope[0]) ? String(info.scope[0]).toUpperCase() : '';
+    const isLocked = info.locked;
     
     let lockBtnHtml = isLocked
       ? `<button type="button" class="btn btn-sm" onclick="toggleSingleCodoLock(${realIdx})" style="background:#dcfce7; color:#166534; border:1px solid #86efac; white-space:nowrap; font-weight:700; min-width:105px; padding:0.4rem;" title="Bấm để MỞ KHÓA">🔒 Đã khóa</button>`
@@ -2335,7 +2343,7 @@ function renderCodoAssignTable() {
   });
 }
 
-function onAdminEditCodoScopeInput(realIdx) {
+async function onAdminEditCodoScopeInput(realIdx) {
   const u = systemUsers[realIdx];
   if (!u || u.role !== 'codo') return;
   const sEl = document.getElementById(`codo_assign_scope_${realIdx}`);
@@ -2343,16 +2351,19 @@ function onAdminEditCodoScopeInput(realIdx) {
 
   const newScope = sEl.value.trim().toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
   const homeClass = u.username.replace('codo_', '').toUpperCase();
-  u.scope = newScope.length > 0 ? newScope : [homeClass];
-  u.codoLocked = (u.scope[0] !== homeClass);
+  const finalScope = newScope.length > 0 ? newScope : [homeClass];
+  const finalLocked = (finalScope[0] !== homeClass);
 
-  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+  const res = await updateSingleCodoScopeOnCloud(u.username, finalScope, finalLocked);
+  if (!res.ok) {
+    alert('❌ ' + res.message);
+    return;
+  }
   renderCodoAssignTable();
-  updateSingleCodoScopeOnCloud(u.username, u.scope, u.codoLocked);
   publishUpdate('UPDATE_CODO_SCOPE', {
     username: u.username,
-    scope: u.scope,
-    codoLocked: u.codoLocked
+    scope: finalScope,
+    codoLocked: finalLocked
   });
 }
 function refreshStudentDatalists() {
@@ -2680,6 +2691,45 @@ function generateDefaultUsers() {
 
 let systemUsers = JSON.parse(localStorage.getItem('yka_system_users_v1')) || generateDefaultUsers();
 let loggedUser = null;
+// ==================== KHO PHÂN CÔNG CỜ ĐỎ ĐỘC LẬP ====================
+let codoAssignMap = JSON.parse(localStorage.getItem('yka_codo_assign_v1')) || {};
+
+function getCodoAssignInfo(username) {
+  const key = String(username || '').trim().toLowerCase();
+  const homeClass = key.replace('codo_', '').toUpperCase();
+  if (codoAssignMap && codoAssignMap[key] && Array.isArray(codoAssignMap[key].scope)) {
+    const sc = codoAssignMap[key].scope;
+    const isLocked = (codoAssignMap[key].locked === true && sc.length > 0 && String(sc[0]).toUpperCase() !== homeClass);
+    return { scope: sc, locked: isLocked };
+  }
+  const uObj = systemUsers.find(u => u.username.toLowerCase() === key);
+  if (uObj) {
+    const sc = Array.isArray(uObj.scope) ? uObj.scope : [homeClass];
+    const isLocked = (uObj.codoLocked === true && sc.length > 0 && String(sc[0]).toUpperCase() !== homeClass);
+    return { scope: sc, locked: isLocked };
+  }
+  return { scope: [homeClass], locked: false };
+}
+
+function applyCodoAssignMapToSystemUsers() {
+  systemUsers.forEach(u => {
+    if (u.role === 'codo') {
+      const info = getCodoAssignInfo(u.username);
+      u.scope = info.scope;
+      u.codoLocked = info.locked;
+    }
+  });
+  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+}
+
+function syncLoggedUserCodoScope() {
+  if (loggedUser && loggedUser.role === 'codo') {
+    const info = getCodoAssignInfo(loggedUser.username);
+    loggedUser.scope = info.scope;
+    loggedUser.codoLocked = info.locked;
+    sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
+  }
+}
 // Tự động kiểm tra và đảm bảo luôn có đủ 36 tài khoản GVCN chuẩn như tài khoản học sinh
 function ensureGvcnAccountsExist() {
   let changed = false;
@@ -2904,13 +2954,34 @@ function connectMqtt() {
           }
         }
         else if (payload.action === 'UPDATE_CODO_SCOPE') {
-          const targetUser = systemUsers.find(u => u.username.toLowerCase() === payload.data.username.toLowerCase());
-          if (targetUser) {
-            targetUser.scope = payload.data.scope;
-            targetUser.codoLocked = payload.data.codoLocked;
-            localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-            
-            // Cập nhật giao diện nếu là Admin
+          const unameKey = String(payload.data.username || '').toLowerCase();
+          codoAssignMap[unameKey] = {
+            scope: payload.data.scope || [],
+            locked: !!payload.data.codoLocked,
+            updatedAt: Date.now()
+          };
+          localStorage.setItem('yka_codo_assign_v1', JSON.stringify(codoAssignMap));
+          applyCodoAssignMapToSystemUsers();
+
+          // Cập nhật NGAY trên máy học sinh Cờ đỏ đang mở
+          if (loggedUser && loggedUser.username.toLowerCase() === unameKey) {
+            syncLoggedUserCodoScope();
+            setupCodoForm();
+          }
+          if (loggedUser && loggedUser.role === 'admin') {
+            if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
+            if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
+          }
+        }
+        else if (payload.action === 'UPDATE_ALL_CODO_ASSIGN') {
+          if (payload.data && typeof payload.data === 'object') {
+            codoAssignMap = payload.data;
+            localStorage.setItem('yka_codo_assign_v1', JSON.stringify(codoAssignMap));
+            applyCodoAssignMapToSystemUsers();
+            if (loggedUser && loggedUser.role === 'codo') {
+              syncLoggedUserCodoScope();
+              setupCodoForm();
+            }
             if (loggedUser && loggedUser.role === 'admin') {
               if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
               if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
@@ -3095,50 +3166,55 @@ async function handleLoginSubmit(e) {
     }
 
     // ====================================================================
-    // XÁC THỰC BÌNH THƯỜNG CHO HỌC SINH / GVCN
+    // XÁC THỰC TRỰC TIẾP VỚI SERVER ĐỂ KHÔNG BAO GIỜ LỆCH MẬT KHẨU KHI LƯU
     // ====================================================================
     let loggedInUser = null;
+    let serverReachable = false;
 
-    // 1. KIỂM TRA BỘ NHỚ MÁY TRƯỚC (Ưu tiên tốc độ tức thì như Admin)
-    const localFound = systemUsers.find(user => user.username.toLowerCase() === uLower);
-    const expectedDefault = uLower.replace('_', '@');
-    
-    if (localFound && (p === localFound.pass || p === expectedDefault)) {
-      loggedInUser = localFound;
-    }
+    const applyServerLoginPayload = (res) => {
+      loggedInUser = res.user;
+      if (res.allUsers && Array.isArray(res.allUsers)) {
+        systemUsers = res.allUsers;
+        localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+      }
+      if (res.codoAssign && typeof res.codoAssign === 'object') {
+        codoAssignMap = res.codoAssign;
+        localStorage.setItem('yka_codo_assign_v1', JSON.stringify(codoAssignMap));
+        applyCodoAssignMapToSystemUsers();
+      }
+    };
 
-    // 2. NẾU SAI PASS HOẶC MÁY CHƯA LƯU, MỚI GỌI LÊN GOOGLE DRIVE (Chấp nhận chậm)
-    if (!loggedInUser) {
+    try {
+      const url = `${MASTER_APP_SCRIPT_URL}?action=login&u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}&t=${Date.now()}`;
+      const response = await fetch(url, { redirect: "follow" });
+      const res = await response.json();
+      serverReachable = true;
+      if (res && res.status === 'success' && res.user) {
+        applyServerLoginPayload(res);
+      } else if (res && res.status === 'invalid') {
+        alert('❌ Tên đăng nhập hoặc mật khẩu không đúng! (Nếu bạn đã đổi mật khẩu, hãy nhập mật khẩu mới; nếu quên, báo Admin bấm Reset).');
+        return;
+      }
+    } catch (err1) {
       try {
-        const url = `${MASTER_APP_SCRIPT_URL}?action=login&u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}&t=${Date.now()}`;
-        const response = await fetch(url, { redirect: "follow" });
-        const res = await response.json();
-        if (res && res.status === 'success' && res.user) {
-          loggedInUser = res.user;
-          if (res.allUsers && Array.isArray(res.allUsers)) {
-            systemUsers = res.allUsers;
-            localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-          }
-        } else if (res && res.status === 'invalid') {
+        const resJsonp = await verifyLoginViaJsonp(u, p);
+        serverReachable = true;
+        if (resJsonp && resJsonp.status === 'success' && resJsonp.user) {
+          applyServerLoginPayload(resJsonp);
+        } else if (resJsonp && resJsonp.status === 'invalid') {
           alert('❌ Tên đăng nhập hoặc mật khẩu không đúng!');
           return;
         }
-      } catch (err1) {
-        try {
-          const resJsonp = await verifyLoginViaJsonp(u, p);
-          if (resJsonp && resJsonp.status === 'success' && resJsonp.user) {
-            loggedInUser = resJsonp.user;
-            if (resJsonp.allUsers && Array.isArray(resJsonp.allUsers)) {
-              systemUsers = resJsonp.allUsers;
-              localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-            }
-          } else if (resJsonp && resJsonp.status === 'invalid') {
-            alert('❌ Tên đăng nhập hoặc mật khẩu không đúng!');
-            return;
-          }
-        } catch (err2) {
-          console.warn("Lỗi mạng, không thể kết nối tới Google Server.");
-        }
+      } catch (err2) {
+        console.warn("Mất kết nối máy chủ, thử kiểm tra phiên cục bộ.");
+      }
+    }
+
+    // Chỉ dự phòng bộ nhớ máy khi thực sự mất mạng (không cho dùng mật khẩu mặc định vượt mặt Server)
+    if (!loggedInUser && !serverReachable) {
+      const localFound = systemUsers.find(user => user.username.toLowerCase() === uLower);
+      if (localFound && localFound.pass && p === localFound.pass) {
+        loggedInUser = localFound;
       }
     }
 
@@ -3171,6 +3247,7 @@ function logout() {
 
 function setupUserSessionUI() {
   if (!loggedUser) return;
+  syncLoggedUserCodoScope();
 
   // 1. Ghi nhớ tab đang mở (Khắc phục lỗi nhảy trang)
   let currentTab = 'board';
@@ -5046,73 +5123,88 @@ function setupCodoForm() {
   const classSel = document.getElementById('codoClassSelect');
   const btnLock = document.getElementById('btnLockMyCodoClass');
   const noticeEl = document.getElementById('codoClassLockNotice');
+  const submitBtn = document.querySelector('#codoForm button[type="submit"]');
+  const zeroBtn = document.querySelector('button[onclick="handleCodoZeroViolationReport()"]');
   if (!classSel) return;
   classSel.innerHTML = '';
 
-  const currentUserObj = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase()) || loggedUser;
-  const homeClass = currentUserObj.username.replace('codo_', '').toUpperCase();
-  const currentAssigned = (currentUserObj.scope && currentUserObj.scope[0]) ? currentUserObj.scope[0].toUpperCase() : '';
-
-  // Tự động MỞ KHÓA nếu: Admin bấm mở (false), HOẶC chưa từng chốt (undefined), HOẶC lớp đang gán vẫn trùng với lớp gốc của mình
-  const isUnlockedForSelection = (
-    currentUserObj.codoLocked === false || 
-    currentUserObj.codoLocked === undefined || 
-    currentAssigned === homeClass
-  );
+  syncLoggedUserCodoScope();
 
   if (loggedUser.role === 'admin') {
     CLASSES.forEach(c => {
       classSel.innerHTML += `<option value="${c.id}">Chi đoàn ${c.id}</option>`;
     });
+    classSel.disabled = false;
     if (btnLock) btnLock.style.display = 'none';
+    if (submitBtn) submitBtn.disabled = false;
+    if (zeroBtn) zeroBtn.disabled = false;
     if (noticeEl) noticeEl.innerHTML = `<span style="color:var(--success); font-weight:600;">👑 Quyền Admin: Được phép chọn tất cả 36 chi đoàn.</span>`;
     document.getElementById('codoAssignedScopeBadge').textContent = `Phạm vi: Toàn trường (36 lớp)`;
-  } else if (isUnlockedForSelection) {
-    CLASSES.forEach(c => {
-      const selectedAttr = (currentAssigned === c.id) ? 'selected' : '';
-      classSel.innerHTML += `<option value="${c.id}" ${selectedAttr}>Chi đoàn ${c.id}</option>`;
-    });
-    classSel.disabled = false;
-    if (btnLock) btnLock.style.display = 'inline-flex';
-    if (noticeEl) {
-      noticeEl.innerHTML = `<strong style="color:var(--warning);">🔓 Đang mở chọn lớp:</strong> Hãy chọn đúng lớp bạn được phân công chấm tuần này rồi bấm nút <strong>"📌 Chốt lớp chấm"</strong> để khóa lại!`;
-    }
-    document.getElementById('codoAssignedScopeBadge').textContent = `⏳ Chưa chốt lớp chấm tuần này`;
   } else {
-    const assigned = currentUserObj.scope || loggedUser.scope || [];
-    assigned.forEach(cid => {
-      classSel.innerHTML += `<option value="${cid}">Chi đoàn ${cid} (Đã khóa)</option>`;
-    });
-    if (btnLock) btnLock.style.display = 'none';
-    if (noticeEl) {
-      noticeEl.innerHTML = `<span style="color:var(--success); font-weight:600;">🔒 Đã khóa phân công tuần này: Chi đoàn ${assigned.join(', ')}</span> (Nếu nhầm, hãy báo Admin mở khóa).`;
+    const info = getCodoAssignInfo(loggedUser.username);
+    const homeClass = loggedUser.username.replace('codo_', '').toUpperCase();
+    const isUnlockedForSelection = !info.locked;
+
+    if (isUnlockedForSelection) {
+      // Ẩn luôn lớp gốc để HS không chọn nhầm lớp mình
+      classSel.innerHTML = `<option value="">-- BƯỚC 1: Chọn lớp chấm tuần này --</option>`;
+      CLASSES.forEach(c => {
+        if (c.id !== homeClass) {
+          classSel.innerHTML += `<option value="${c.id}">Chi đoàn ${c.id}</option>`;
+        }
+      });
+      classSel.disabled = false;
+      if (btnLock) btnLock.style.display = 'inline-flex';
+
+      // KHÓA TẠM 2 nút gửi báo cáo để HS không thể quên bấm "📌 Chốt lớp chấm"
+      if (submitBtn) submitBtn.disabled = true;
+      if (zeroBtn) zeroBtn.disabled = true;
+
+      if (noticeEl) {
+        noticeEl.innerHTML = `<strong style="color:#b45309; background:#fef3c7; padding:3px 6px; border-radius:4px; display:inline-block;">🔓 BẮT BUỘC: Chọn lớp ở ô trên rồi bấm nút [📌 Chốt lớp chấm] để mở khóa ghi nhận vi phạm!</strong>`;
+      }
+      document.getElementById('codoAssignedScopeBadge').textContent = `⏳ Chưa chốt lớp chấm tuần này`;
+    } else {
+      info.scope.forEach(cid => {
+        classSel.innerHTML += `<option value="${cid}">Chi đoàn ${cid} (Đã khóa)</option>`;
+      });
+      classSel.disabled = false;
+      if (btnLock) btnLock.style.display = 'none';
+      if (submitBtn) submitBtn.disabled = false;
+      if (zeroBtn) zeroBtn.disabled = false;
+      if (noticeEl) {
+        noticeEl.innerHTML = `<span style="color:var(--success); font-weight:600;">🔒 Đã khóa phân công tuần này: Chi đoàn ${info.scope.join(', ')}</span> (Nếu nhầm, hãy báo Admin mở khóa).`;
+      }
+      document.getElementById('codoAssignedScopeBadge').textContent = `🔒 Lớp chấm tuần này: ${info.scope.join(', ')}`;
     }
-    document.getElementById('codoAssignedScopeBadge').textContent = `🔒 Lớp chấm tuần này: ${assigned.join(', ')}`;
   }
 
   if (classSel.value) updateStudentDatalist(classSel.value);
   renderCodoLogsTable();
 }
 
-// 1. Khi Cờ đỏ chọn lớp xong và bấm "📌 Chốt lớp chấm" -> Tự động khóa ngay
+// 1. Cờ đỏ chọn lớp và bấm "📌 Chốt lớp chấm" (Có đọc kết quả thật từ Server)
 async function confirmAndLockMyCodoClass() {
   const classSel = document.getElementById('codoClassSelect');
-  if (!classSel || !classSel.value) return;
+  const btnLock = document.getElementById('btnLockMyCodoClass');
+  if (!classSel || !classSel.value) {
+    alert('⚠️ Vui lòng chọn Chi đoàn bạn được phân công chấm trong danh sách trước khi bấm Chốt!');
+    return;
+  }
   const chosenClass = classSel.value;
+  const uLower = loggedUser.username.toLowerCase();
+  const homeClass = uLower.replace('codo_', '').toUpperCase();
 
-  const homeClass = loggedUser.username.replace('codo_', '').toUpperCase();
   if (chosenClass === homeClass) {
     alert(`⛔ Bạn là Cờ đỏ của lớp ${homeClass}, không được chọn tự chấm chính lớp mình!`);
     return;
   }
 
-  const conflictUser = systemUsers.find(u => 
-    u.role === 'codo' && 
-    u.username.toLowerCase() !== loggedUser.username.toLowerCase() && 
-    u.codoLocked === true && 
-    Array.isArray(u.scope) && 
-    u.scope.includes(chosenClass)
-  );
+  const conflictUser = systemUsers.find(u => {
+    if (u.role !== 'codo' || u.username.toLowerCase() === uLower) return false;
+    const inf = getCodoAssignInfo(u.username);
+    return inf.locked && inf.scope.includes(chosenClass);
+  });
 
   if (conflictUser) {
     if (!confirm(`⚠️ CẢNH BÁO TRÙNG LỚP:\nChi đoàn ${chosenClass} hiện đã được [${conflictUser.name}] nhận chấm.\n\nBạn có chắc chắn mình được phân công chấm lớp ${chosenClass} không?`)) {
@@ -5124,87 +5216,116 @@ async function confirmAndLockMyCodoClass() {
     }
   }
 
-  const userIdx = systemUsers.findIndex(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
-  if (userIdx !== -1) {
-    systemUsers[userIdx].scope = [chosenClass];
-    systemUsers[userIdx].codoLocked = true;
+  if (btnLock) {
+    btnLock.disabled = true;
+    btnLock.innerHTML = '⏳ Đang lưu...';
   }
 
-  loggedUser.scope = [chosenClass];
-  loggedUser.codoLocked = true;
-  sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
+  try {
+    const res = await updateSingleCodoScopeOnCloud(loggedUser.username, [chosenClass], true);
+    if (!res.ok) {
+      alert('❌ KHÔNG THỂ CHỐT LỚP:\n' + res.message);
+      return;
+    }
 
-  lastCloudFetchTime = Date.now();
-  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-  await updateSingleCodoScopeOnCloud(loggedUser.username, [chosenClass], true);
-  // CHỈ GỬI ĐÚNG TÀI KHOẢN VỪA CHỐT LỚP
-  publishUpdate('UPDATE_CODO_SCOPE', {
-  username: loggedUser.username,
-  scope: [chosenClass],
-  codoLocked: true
-});
+    syncLoggedUserCodoScope();
+    publishUpdate('UPDATE_CODO_SCOPE', {
+      username: loggedUser.username,
+      scope: [chosenClass],
+      codoLocked: true
+    });
 
-  setupUserSessionUI();
-  alert(`✅ Đã chốt và khóa phân công thành công: Chi đoàn ${chosenClass}!`);
+    setupCodoForm();
+    alert(`✅ Đã chốt và khóa phân công thành công: Chi đoàn ${chosenClass}! Bây giờ bạn có thể nhập vi phạm hoặc báo cáo 0 lỗi.`);
+  } finally {
+    if (btnLock) {
+      btnLock.disabled = false;
+      btnLock.innerHTML = '📌 Chốt lớp chấm';
+    }
+  }
 }
 
-// DANH SÁCH VÒNG TRÒN 36 LỚP KHÉP KÍN: 12A1..12A12 -> 11A1..11A12 -> 10A1..10A12 -> Quay về 12A1
+// DANH SÁCH VÒNG TRÒN 36 LỚP KHÉP KÍN
 const CODO_RING_36 = [];
 ['12', '11', '10'].forEach(g => {
   for (let i = 1; i <= 12; i++) CODO_RING_36.push(`${g}A${i}`);
 });
 
+async function saveAllCodoAssignToCloud() {
+  localStorage.setItem('yka_codo_assign_v1', JSON.stringify(codoAssignMap));
+  localStorage.setItem('yka_last_codo_save', Date.now().toString());
+  applyCodoAssignMapToSystemUsers();
+  const bodyStr = JSON.stringify(attachAuthCredentials({ action: "save_codo_assign_all", content: codoAssignMap }));
+  try {
+    const resp = await fetch(MASTER_APP_SCRIPT_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: bodyStr
+    });
+    const r = await resp.json();
+    if (r && r.status === 'error') {
+      alert('❌ Lỗi lưu phân công: ' + r.message);
+      return false;
+    }
+  } catch (e) {
+    await fetch(MASTER_APP_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: bodyStr
+    });
+  }
+  // CHỈ bắn bảng phân công (tuyệt đối không bắn mật khẩu)
+  publishUpdate('UPDATE_ALL_CODO_ASSIGN', codoAssignMap);
+  return true;
+}
+
 // Mở khóa đồng loạt cho 36 Cờ đỏ tự chọn lớp
 async function adminUnlockAllCodoSelection() {
-  lastCloudFetchTime = Date.now() + 60000;
-  isFetchingCloud = false;
-
   systemUsers.forEach(u => {
-    if (u.role === 'codo') u.codoLocked = false;
+    if (u.role === 'codo') {
+      const key = u.username.toLowerCase();
+      const homeClass = key.replace('codo_', '').toUpperCase();
+      codoAssignMap[key] = { scope: [homeClass], locked: false, updatedAt: Date.now() };
+    }
   });
 
-  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+  await saveAllCodoAssignToCloud();
   if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
 
   const pNotice = document.getElementById('codoAssignNotice');
   if (pNotice) {
     pNotice.innerHTML = `<strong style="color:#b45309; background:#fffbeb; padding:0.45rem 0.85rem; border-radius:6px; border:1px solid #fde68a; display:inline-block;">🔓 ĐÃ MỞ KHÓA: Toàn bộ 36 tài khoản Cờ đỏ hiện đã có thể tự chọn lớp chấm!</strong>`;
   }
-
-  updateUsersLocalAndCloud();
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
 }
 
-// Hàm Tiến (+1) hoặc Lùi (-1) trên vòng tròn 36 lớp
+// Xoay Tiến (+1) hoặc Lùi (-1) trên vòng tròn 36 lớp
 async function adminStepCodoCircle(stepDelta) {
-  lastCloudFetchTime = Date.now() + 60000;
-  isFetchingCloud = false;
-
-  const total = CODO_RING_36.length; 
+  const total = CODO_RING_36.length;
   let preview = [];
 
   systemUsers.forEach(u => {
     if (u.role !== 'codo') return;
-
-    const homeClass = u.username.replace('codo_', '').trim().toUpperCase();
-    const curTarget = (u.scope && u.scope[0]) ? String(u.scope[0]).trim().toUpperCase() : homeClass;
+    const key = u.username.toLowerCase();
+    const homeClass = key.replace('codo_', '').toUpperCase();
+    const curInfo = getCodoAssignInfo(u.username);
+    const curTarget = (curInfo.scope && curInfo.scope[0]) ? String(curInfo.scope[0]).trim().toUpperCase() : homeClass;
 
     let curIdx = CODO_RING_36.indexOf(curTarget);
     if (curIdx === -1) curIdx = CODO_RING_36.indexOf(homeClass);
     if (curIdx === -1) return;
 
-    let nextIdx = (curIdx + stepDelta + total) % total;
+    const nextIdx = (curIdx + stepDelta + total) % total;
     const nextClass = CODO_RING_36[nextIdx];
-
-    u.scope = [nextClass];
-    u.codoLocked = (nextClass !== homeClass);
+    codoAssignMap[key] = { scope: [nextClass], locked: (nextClass !== homeClass), updatedAt: Date.now() };
 
     if (['12A1', '12A12', '11A12', '10A12'].includes(homeClass)) {
       preview.push(`${homeClass} ➔ ${nextClass}`);
     }
   });
 
-  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+  await saveAllCodoAssignToCloud();
   if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
 
   const pNotice = document.getElementById('codoAssignNotice');
@@ -5212,38 +5333,30 @@ async function adminStepCodoCircle(stepDelta) {
     const dirText = stepDelta > 0 ? '⏩ ĐÃ XOAY TIẾN (+1 LỚP)' : '⏪ ĐÃ QUAY LÙI (-1 LỚP)';
     pNotice.innerHTML = `<strong style="color:var(--success); background:#dcfce7; padding:0.45rem 0.85rem; border-radius:6px; border:1px solid #86efac; display:inline-block;">${dirText}: ${preview.join(' | ')} (Đã khóa)</strong>`;
   }
-
-  updateUsersLocalAndCloud();
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
 }
 
-// Hàm đặt lại chuẩn xác theo số Tuần (1 -> 35) hoặc Reset (0) bất chấp trước đó đã bấm nhầm bao nhiêu lần
+// Đặt chuẩn theo số Tuần (1 -> 35) hoặc Reset về lớp gốc (0)
 async function adminSetCodoByWeek(weekNum) {
-  lastCloudFetchTime = Date.now() + 60000;
-  isFetchingCloud = false;
-
-  const total = CODO_RING_36.length; 
+  const total = CODO_RING_36.length;
   let preview = [];
 
   systemUsers.forEach(u => {
     if (u.role !== 'codo') return;
-
-    const homeClass = u.username.replace('codo_', '').trim().toUpperCase();
+    const key = u.username.toLowerCase();
+    const homeClass = key.replace('codo_', '').toUpperCase();
     const homeIdx = CODO_RING_36.indexOf(homeClass);
     if (homeIdx === -1) return;
 
     const targetIdx = (homeIdx + weekNum) % total;
     const targetClass = CODO_RING_36[targetIdx];
-
-    u.scope = [targetClass];
-    u.codoLocked = (weekNum > 0);
+    codoAssignMap[key] = { scope: [targetClass], locked: (weekNum > 0), updatedAt: Date.now() };
 
     if (['12A1', '12A12', '11A12', '10A12'].includes(homeClass)) {
       preview.push(`${homeClass} ➔ ${targetClass}`);
     }
   });
 
-  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+  await saveAllCodoAssignToCloud();
   if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
 
   const pNotice = document.getElementById('codoAssignNotice');
@@ -5251,9 +5364,6 @@ async function adminSetCodoByWeek(weekNum) {
     const label = weekNum === 0 ? '🔄 ĐÃ RESET VỀ LỚP GỐC' : `📌 ĐÃ ĐẶT CHUẨN TUẦN ${weekNum}`;
     pNotice.innerHTML = `<strong style="color:var(--primary); background:#eff6ff; padding:0.45rem 0.85rem; border-radius:6px; border:1px solid #93c5fd; display:inline-block;">${label}: ${preview.join(' | ')}</strong>`;
   }
-
-  updateUsersLocalAndCloud();
-  publishUpdate('UPDATE_ALL_USERS', systemUsers);
 }
 
 // Hàm điền nhanh chữ "Tập thể [Lớp]" khi bấm nút hoặc khi chọn lỗi tập thể
@@ -5511,8 +5621,13 @@ async function uploadImageToDrive(file, prefix, classId) {
 // =========================================================================
 async function handleCodoViolationSubmit(e) {
   e.preventDefault();
+  syncLoggedUserCodoScope();
   const classId = document.getElementById('codoClassSelect').value;
 
+  if (loggedUser.role === 'codo' && !loggedUser.codoLocked) {
+    alert('⚠️ Bạn chưa bấm nút [📌 Chốt lớp chấm]! Hãy chọn lớp được giao rồi bấm Chốt trước khi lưu biên bản.');
+    return;
+  }
   if (!loggedUser.scope.includes(classId) && loggedUser.role !== 'admin') {
     alert('⛔ LỖI PHÂN QUYỀN: Bạn không được phân công chấm chi đoàn này!');
     return;
@@ -6041,7 +6156,11 @@ function renderTnxkLogsTable() {
 async function handleCodoZeroViolationReport() {
   const classId = document.getElementById('codoClassSelect').value;
   const date = document.getElementById('codoDateInput').value;
-
+  syncLoggedUserCodoScope();
+  if (loggedUser && loggedUser.role === 'codo' && !loggedUser.codoLocked) {
+    alert('⚠️ Bạn chưa bấm nút [📌 Chốt lớp chấm]! Hãy chọn lớp được giao rồi bấm Chốt trước khi báo cáo.');
+    return;
+  }
   if (!classId || !date) {
     alert('⚠️️ Vui lòng chọn Ngày ghi nhận và Chi đoàn cần báo cáo!');
     return;
@@ -6707,52 +6826,87 @@ async function toggleSingleCodoLock(idx) {
   const u = systemUsers[idx];
   if (!u || u.role !== 'codo') return;
 
-  // Đổi ID lấy dữ liệu sang thẻ Phân Công thay vì thẻ Quản Lý Tài Khoản
   const sEl = document.getElementById(`codo_assign_scope_${idx}`);
+  const currentInfo = getCodoAssignInfo(u.username);
+  let newScope = currentInfo.scope;
   if (sEl && sEl.value.trim()) {
-    u.scope = sEl.value.trim().toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
+    newScope = sEl.value.trim().toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
   }
 
   const homeClass = u.username.replace('codo_', '').toUpperCase();
-  const currentAssigned = (u.scope && u.scope[0]) ? String(u.scope[0]).toUpperCase() : '';
-  const currentlyLocked = (u.codoLocked === true && currentAssigned !== '' && currentAssigned !== homeClass);
+  const currentAssigned = (newScope && newScope[0]) ? String(newScope[0]).toUpperCase() : '';
+  const currentlyLocked = currentInfo.locked;
 
   if (!currentlyLocked && (currentAssigned === '' || currentAssigned === homeClass)) {
     alert(`⚠️ Lớp phân công của [${u.username}] hiện đang trùng với lớp gốc (${homeClass}).\nVui lòng gõ tên lớp chấm chéo (VD: 10A5) vào ô trước khi bấm Khóa!`);
     return;
   }
 
-  // Đảo trạng thái Khóa <-> Mở
-  u.codoLocked = !currentlyLocked;
+  const nextLocked = !currentlyLocked;
+  const res = await updateSingleCodoScopeOnCloud(u.username, newScope, nextLocked);
+  if (!res.ok) {
+    alert('❌ ' + res.message);
+    return;
+  }
 
-  lastCloudFetchTime = Date.now() + 30000;
-  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-  
-  // Quan trọng nhất: Gọi hàm vẽ lại thẻ Phân Công, TUYỆT ĐỐI KHÔNG vẽ lại thẻ Quản Lý Tài khoản
   if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
-
-  // Lưu lẻ trạng thái lên Google Drive và bắn MQTT
-  updateSingleCodoScopeOnCloud(u.username, u.scope, u.codoLocked);
   publishUpdate('UPDATE_CODO_SCOPE', {
-  username: u.username,
-  scope: u.scope,
-  codoLocked: u.codoLocked
-});
+    username: u.username,
+    scope: newScope,
+    codoLocked: nextLocked
+  });
 }
 
-// Hàm gửi lẻ phân công của 1 Cờ đỏ lên Cloud (Tránh việc 2 Cờ đỏ cùng chốt lớp 1 lúc bị đè nhau)
 async function updateSingleCodoScopeOnCloud(username, scopeArr, codoLockedState) {
-  localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+  const key = String(username || '').toLowerCase();
+  const bodyStr = JSON.stringify(attachAuthCredentials({
+    action: "update_codo_assign",
+    username: key,
+    scope: scopeArr,
+    locked: !!codoLockedState
+  }));
+
   try {
-    await fetch(MASTER_APP_SCRIPT_URL, {
+    // Ưu tiên gọi chuẩn để đọc được phản hồi thành công / từ chối thật từ Google Server
+    const resp = await fetch(MASTER_APP_SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors',
+      redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(attachAuthCredentials({ action: "update_single_codo_scope", username: username, scope: scopeArr, codoLocked: codoLockedState }))
+      body: bodyStr
     });
+    const result = await resp.json();
+    if (result && result.status === 'error') {
+      return { ok: false, message: result.message || 'Máy chủ từ chối cập nhật phân công!' };
+    }
   } catch (e) {
-    console.error("Lỗi lưu phân công Cờ đỏ:", e);
+    // Dự phòng nếu trình duyệt bị dính CORS (nhiều Gmail): gửi no-cors + tự đối chiếu lại sau 5 giây
+    try {
+      await fetch(MASTER_APP_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: bodyStr
+      });
+      setTimeout(async () => {
+        try {
+          const db = await loadCloudDataViaJsonp();
+          const sv = (db && db.codoAssign) ? db.codoAssign[key] : null;
+          if (!sv || sv.locked !== !!codoLockedState || (sv.scope && sv.scope[0]) !== scopeArr[0]) {
+            alert('⚠️ Mạng quá tải hoặc phiên đăng nhập chưa khớp nên phân công chưa lưu được lên Google Drive. Vui lòng Đăng xuất rồi Đăng nhập lại và thử lại!');
+          }
+
+        } catch (_) {}
+      }, 5000);
+    } catch (err2) {
+      return { ok: false, message: 'Không có kết nối mạng tới máy chủ Google!' };
+    }
   }
+
+  codoAssignMap[key] = { scope: scopeArr, locked: !!codoLockedState, updatedAt: Date.now() };
+  localStorage.setItem('yka_codo_assign_v1', JSON.stringify(codoAssignMap));
+  localStorage.setItem('yka_last_codo_save', Date.now().toString());
+  applyCodoAssignMapToSystemUsers();
+  return { ok: true };
 }
 
 function resetUserPass(idx) {
