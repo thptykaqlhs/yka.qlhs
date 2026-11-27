@@ -1768,51 +1768,6 @@
     }
   }
 
-
-  /* ==================== 13. FIX CHỐNG TRÀN Ô CHỌN LỚP & HIỂN THỊ RÕ NÚT CHỐT LỚP CHẤM ==================== */
-  .form-group {
-    min-width: 0;
-  }
-  .form-group input,
-  .form-group select,
-  .form-group textarea {
-    max-width: 100%;
-    min-width: 0;
-  }
-  .v6-codo-class-group {
-    background: #f8fbff;
-    border: 1.5px solid #bfdbfe;
-    border-radius: 12px;
-    padding: 0.75rem 0.9rem;
-  }
-  .v6-codo-select-row {
-    display: flex;
-    gap: 0.55rem;
-    align-items: stretch;
-    flex-wrap: wrap;
-    width: 100%;
-  }
-  .v6-codo-select-row #codoClassSelect {
-    flex: 1 1 210px;
-    min-width: 0;
-    width: 100%;
-  }
-  .v6-codo-select-row #btnLockMyCodoClass {
-    flex: 0 0 auto;
-    padding: 0.56rem 1.15rem !important;
-    font-size: 0.86rem !important;
-    background: linear-gradient(90deg, #ea580c, #f59e0b) !important;
-    color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35) !important;
-  }
-  @media (max-width: 600px) {
-    .v6-codo-select-row #btnLockMyCodoClass {
-      width: 100%;
-      justify-content: center;
-      padding: 0.68rem 1rem !important;
-    }
-  }
-
   /* ==================== 12. CHẾ ĐỘ IN BÁO CÁO TIẾT KIỆM MỰC ==================== */
   @media print {
     .v6-podium-wrap, .v6-toolbar-strip, .v5-kpi-icon, .no-print {
@@ -2186,7 +2141,7 @@
     <div class="card">
       <div class="card-header">
         <h2>❓ HƯỚNG DẪN SỬ DỤNG HỆ THỐNG THI ĐUA YÊN KHÁNH A</h2>
-        <span class="badge badge-info">Phiên bản Giao diện 7.0 Pro — Bảo vệ MK & Xếp hạng đồng hạng</span>
+        <span class="badge badge-info">Phiên bản Giao diện 6.0 Pro — Đồng nhất 100%</span>
       </div>
       <div class="card-body">
         <div class="v5-help-grid">
@@ -2308,7 +2263,7 @@
                 <th style="text-align:center;">Khối</th>
                 <th style="text-align:center;">Sĩ số</th>
                 <th style="text-align:center;">Trừ Nề nếp & ATGT (Cờ đỏ/TNXK)</th>
-                <th style="text-align:center;">Trừ Tiết học & Điểm kém (SĐB)</th>
+                <th style="text-align:center;">Trừ Tiết học, VP Giờ học & Điểm kém (SĐB)</th>
                 <th style="text-align:center;">Trừ Nghỉ học (SĐB)</th>
                 <th style="text-align:center;">TỔNG ĐIỂM BỊ TRỪ</th>
                 <th style="text-align:center;">TỔNG ĐIỂM CỘNG BÙ</th>
@@ -2448,6 +2403,80 @@
           </div>
         </div>
 
+        <!-- MỤC 4: GHI NHẬN HỌC SINH VI PHẠM TRONG GIỜ HỌC (SĐB) -->
+        <div class="sub-box" style="border-left: 4px solid var(--danger); background:#fffafb;">
+          <div class="sub-box-title" style="color:var(--danger) !important;">
+            <span>4. GHI NHẬN HỌC SINH VI PHẠM TRONG GIỜ HỌC (THEO GHI CHÚ CỦA GVBM TRONG SĐB)</span>
+            <span class="badge badge-danger">Tự động duyệt • Trừ cả Cá nhân & Chi đoàn</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            Ghi nhận các lỗi cá nhân trong giờ học (ngủ gật, không làm bài tập, mất trật tự, dùng điện thoại, vô lễ...). Lỗi được tự động duyệt ngay, tính vào cả điểm cá nhân lẫn Chi đoàn và hiển thị ở Tab Duyệt/Khiếu nại để GVCN/HS đối soát.
+          </p>
+          <div class="form-grid" style="margin-bottom:0.85rem;">
+            <div class="form-group">
+              <label>Ngày vi phạm (*):</label>
+              <input type="date" id="sdbViolDate">
+            </div>
+            <div class="form-group">
+              <label>Họ và tên học sinh vi phạm (*):</label>
+              <input type="text" id="sdbViolStudentInput" list="studentDatalist" placeholder="Gõ hoặc chọn tên học sinh trong lớp...">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label>Hành vi vi phạm trong giờ học (*):</label>
+              <select id="sdbViolRuleSelect" onchange="onSdbViolRuleChange()">
+                <option value="">-- Chọn lỗi vi phạm trong giờ học --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mức điểm quy định:</label>
+              <input type="text" id="sdbViolBasePointDisplay" class="locked-input" readonly>
+            </div>
+            <div class="form-group">
+              <label>Hệ số tái phạm:</label>
+              <select id="sdbViolMultSelect" onchange="calcSdbViolPoints()">
+                <option value="1">Lần đầu trong tuần (x1)</option>
+                <option value="2">Tái phạm lần 2 (x2)</option>
+                <option value="3">Tái phạm từ lần 3 trở lên (x3)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Điểm trừ thực tế áp dụng:</label>
+              <input type="number" id="sdbViolFinalPointInput" class="locked-input" style="font-weight:bold; color:var(--danger);" readonly>
+            </div>
+            <div class="form-group">
+              <label>📷 Ảnh trang SĐB minh chứng (Tùy chọn):</label>
+              <input type="file" id="sdbViolImageEvidence" accept="image/*" onchange="handleImagePreview(this, 'sdbViolImgPreview')">
+              <div id="sdbViolImgPreview" class="img-preview-box"></div>
+            </div>
+            <div class="form-group full-width">
+              <label>Tiết học / Môn học / Ghi chú của GVBM (*):</label>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                <input type="text" id="sdbViolEvidenceInput" placeholder="VD: Tiết 2 - Môn Vật lí - Ngủ gật trong giờ, GVBM nhắc nhở..." style="flex:1; min-width:220px;">
+                <button type="button" id="btnAddSdbViolation" class="btn btn-danger" onclick="handleSdbViolationSubmit()" style="white-space:nowrap;">
+                  ➕ Lưu Lỗi Giờ Học
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-responsive v6-sticky-table v6-mobile-cards-wrap">
+            <table class="v6-mobile-cards">
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>Họ và tên học sinh</th>
+                  <th>Lỗi vi phạm trong giờ học</th>
+                  <th style="text-align:center;">Điểm trừ</th>
+                  <th>Tiết / Môn / Ghi chú & Ảnh SĐB</th>
+                  <th style="text-align:center;">Trạng thái</th>
+                  <th style="text-align:center; width:85px;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="sdbViolationsListBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- TỔNG HỢP LIVE & NÚT LƯU -->
         <div style="padding:1rem 1.25rem; background:#eff6ff; border-radius:10px; border:1px solid #bfdbfe; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
           <div>
@@ -2455,6 +2484,7 @@
               <span>Trừ giờ học: <strong id="sdbLiveHourPenalty" style="color:var(--danger);">-2 đ</strong> | </span>
               <span>Thưởng 100% Tốt (C06): <strong id="sdbLiveHourBonus" style="color:var(--success);">0 đ</strong> | </span>
               <span>Trừ nghỉ học: <strong id="sdbLiveAbsencePenalty" style="color:var(--danger);">0 đ</strong> | </span>
+              <span>Trừ VP giờ học: <strong id="sdbLiveViolPenalty" style="color:var(--danger);">0 đ</strong> | </span>
               <span>Điểm thưởng/phạt học tập: <strong id="sdbLiveAcademicBalance" style="color:var(--success);">+13 đ</strong></span>
             </div>
             <div style="font-size:0.95rem; font-weight:800; color:var(--primary); margin-top:0.35rem;">
@@ -2480,6 +2510,7 @@
                   <th style="text-align:center;">Thưởng 100% Tốt</th>
                   <th style="text-align:center;">Số lượt nghỉ (Có/K.Phép)</th>
                   <th style="text-align:center;">Trừ nghỉ học</th>
+                  <th style="text-align:center;">Trừ VP giờ học</th>
                   <th style="text-align:center;">Lượt Giỏi/Kém</th>
                   <th style="text-align:center;">Thưởng/Trừ Đ.Học tập</th>
                 </tr>
@@ -2517,15 +2548,15 @@
               <label>Ngày ghi nhận (*):</label>
               <input type="date" id="codoDateInput" required>
             </div>
-            <div class="form-group full-width v6-codo-class-group">
+            <div class="form-group">
               <label>Chi đoàn vi phạm (*):</label>
-              <div class="v6-codo-select-row">
-                <select id="codoClassSelect" style="font-weight:bold; color:var(--primary);" required></select>
-                <button type="button" id="btnLockMyCodoClass" class="btn btn-primary" onclick="confirmAndLockMyCodoClass()" style="display:none; white-space:nowrap;">
+              <div style="display:flex; gap:0.4rem;">
+                <select id="codoClassSelect" style="flex:1; font-weight:bold; color:var(--primary);" required></select>
+                <button type="button" id="btnLockMyCodoClass" class="btn btn-primary btn-sm" onclick="confirmAndLockMyCodoClass()" style="display:none; white-space:nowrap;">
                   📌 Chốt lớp chấm
                 </button>
               </div>
-              <span id="codoClassLockNotice" style="font-size:0.78rem; color:#dc2626; margin-top:0.2rem;">Hệ thống khóa: Bạn chỉ được ghi nhận lỗi cho lớp được phân công chấm!</span>
+              <span id="codoClassLockNotice" style="font-size:0.75rem; color:#dc2626;">Hệ thống khóa: Bạn chỉ được ghi nhận lỗi cho lớp được phân công chấm!</span>
             </div>
             <div class="form-group">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3000,6 +3031,7 @@
                 <th style="text-align:center;">Nghỉ K.Phép</th>
                 <th style="text-align:center;">VP Nề nếp</th>
                 <th style="text-align:center;">VP ATGT</th>
+                <th style="text-align:center;">VP Giờ học</th>
                 <th style="text-align:center;">Tổng Trừ / Cộng</th>
                 <th style="text-align:center;">ĐTB Tuần</th>
                 <th style="text-align:center;">Xếp Loại Đề Xuất</th>
@@ -3076,7 +3108,8 @@
       </div>
       <div class="card-body">
         <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:0.75rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:0.85rem; color:#166534;">
-          <strong>Nguyên tắc xếp hạng Tập thể:</strong> Xếp thứ tự <strong>thuần túy theo Tổng điểm thi đua tích lũy</strong> (không áp dụng tiêu chí phụ). Chi đoàn có điểm cao nhất xếp Hạng 1; các chi đoàn bằng điểm nhau xếp <strong>đồng hạng</strong>.
+          <strong>Nguyên tắc đánh giá:</strong> Tổng hợp xếp loại thi đua Tập thể căn cứ theo <strong>Quy định khống chế số tuần</strong> của nhà trường. <br>
+          Quy tắc: Dựa trên tổng số tuần đạt loại Tốt (gồm cả Xuất sắc) và khống chế số tuần bị loại Không đạt (Chưa đạt) trong 17 tuần (HK1) hoặc 35 tuần (Cả năm).
         </div>
         <div class="v6-toolbar-strip no-print">
           <div class="v6-chip-group" data-sync-select="hk1ClassFilterGrade">
@@ -3416,7 +3449,7 @@
       </div>
       <div class="card-body">
         <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:1rem; border-radius:8px; margin-bottom:1rem; font-size:0.85rem; color:#1e40af;">
-          <strong>Hướng dẫn:</strong> Thêm mới hoặc Xóa các tiêu chí. Những thay đổi ở đây sẽ tự động cập nhật vào danh sách thả xuống của các tài khoản Cờ đỏ, TNXK và BCH Đoàn. Mức điểm nhập <strong>số dương</strong> (VD: 10). Hệ thống sẽ tự hiểu là Điểm Trừ (đối với Cờ đỏ/TNXK) hoặc Điểm Cộng (với BCH Đoàn).
+          <strong>Hướng dẫn:</strong> Thêm mới hoặc Xóa các tiêu chí. Những thay đổi ở đây sẽ tự động cập nhật vào danh sách thả xuống của các tài khoản Cờ đỏ, TNXK, Sổ Đầu Bài và BCH Đoàn. Mức điểm nhập <strong>số dương</strong> (VD: 10). Hệ thống sẽ tự hiểu là Điểm Trừ (đối với Cờ đỏ/TNXK/SĐB) hoặc Điểm Cộng (với BCH Đoàn).
         </div>
 
         <!-- Form thêm tiêu chí mới -->
@@ -3424,7 +3457,7 @@
           <div class="sub-box-title">Thêm Tiêu Chí Mới</div>
           <div class="form-grid" style="align-items: end;">
             <div class="form-group">
-              <label>Mã (VD: A30, C10):</label>
+              <label>Mã (VD: A30, B15, S08, C10):</label>
               <input type="text" id="newRuleCode" placeholder="Mã duy nhất..." style="text-transform: uppercase;">
             </div>
             <div class="form-group" style="grid-column: span 2;">
@@ -3440,6 +3473,7 @@
               <select id="newRuleGroup">
                 <option value="codo">Cờ Đỏ (Lỗi nề nếp)</option>
                 <option value="tnxk">TNXK (Lỗi ATGT, Chuyên đề)</option>
+                <option value="sdb">Sổ Đầu Bài (Lỗi trong giờ học)</option>
                 <option value="bch">BCH Đoàn (Cộng điểm thưởng)</option>
               </select>
             </div>
@@ -3568,6 +3602,7 @@
                 <option value="total_violations">Tổng số lần vi phạm (>=)</option>
                 <option value="traffic_violations">Số lần vi phạm ATGT - Nhóm B (>=)</option>
                 <option value="discipline_violations">Số lần VP Nề nếp - Nhóm A (>=)</option>
+                <option value="sdb_violations">Số lần VP Giờ học - SĐB (>=)</option>
                 <option value="specific_code">Mắc Mã lỗi cụ thể (Cách nhau dấu phẩy)</option>
               </select>
             </div>
@@ -4064,7 +4099,7 @@ async function fetchDatabaseFromCloud(force = false) {
 
     if (!isDriveStale) {
       if (db.rules && db.rules.length > 0) {
-        RULES = db.rules;
+        RULES = ensureDefaultSdbRules(db.rules);
         localStorage.setItem('yka_rules_v1', JSON.stringify(RULES));
         initRuleSelects(); 
         if (typeof renderRulesConfigTable === 'function') renderRulesConfigTable(); 
@@ -4088,40 +4123,41 @@ async function fetchDatabaseFromCloud(force = false) {
         localStorage.setItem('yka_history_v1', JSON.stringify(weeklyHistory));
       }
 
+      if (db.users && Array.isArray(db.users) && db.users.length > 1) {
+        const incomingUsers = db.users;
+        const isSanitized = incomingUsers.some(u => u.username === 'admin' && u.pass === '');
+
+        if (!isSanitized) {
+          systemUsers = incomingUsers; 
+        } else {
+          systemUsers = systemUsers.map(localU => {
+            const inc = incomingUsers.find(u => u.username === localU.username);
+            return inc ? { ...inc, pass: localU.pass } : localU;
+          });
+        }
+
+        if (ensureGvcnAccountsExist()) {
+          updateUsersLocalAndCloud(); 
+        }
+        localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
+
+        if (loggedUser && loggedUser.role !== 'guest' && loggedUser.role !== 'admin' && loggedUser.mustChangePass === false) {
+          const cloudUser = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
+          if (cloudUser && cloudUser.pass !== loggedUser.pass && !isUsingDefaultPatternPass(loggedUser)) {
+            cloudUser.pass = loggedUser.pass;
+            cloudUser.mustChangePass = false;
+            updateSinglePassToCloud(loggedUser.username, loggedUser.pass);
+            publishUpdate('UPDATE_USER_PASS', { username: loggedUser.username, newPass: loggedUser.pass });
+          }
+        }
+
+        if (loggedUser && loggedUser.role === 'admin') {
+          if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
+          if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
+        }
+      }
     }
     // ======================= KẾT THÚC BẢO VỆ CẤU HÌNH =======================
-    // ĐỒNG BỘ TÀI KHOẢN & MẬT KHẨU ĐỘC LẬP (KHÔNG BỊ CHẶN BỞI LƯU ĐIỂM / MQTT, CHỐNG GHI ĐÈ MẬT KHẨU MẶC ĐỊNH)
-    const lastUsersSave = parseInt(localStorage.getItem('yka_last_users_save') || '0', 10);
-    const isUsersDriveStale = (Date.now() - lastUsersSave < 15000);
-    if (!isUsersDriveStale && db.users && Array.isArray(db.users) && db.users.length > 1) {
-      const incomingUsers = db.users;
-      const isSanitized = incomingUsers.some(u => u.username === 'admin' && (!u.pass || String(u.pass).trim() === ''));
-
-      if (!isSanitized) {
-        systemUsers = incomingUsers;
-        hasVerifiedCloudUsers = true;
-        backupSystemUsersLocally(systemUsers);
-        // Chỉ bổ sung cục bộ nếu thiếu GVCN, TUYỆT ĐỐI không tự đẩy đè db_users.json
-        ensureGvcnAccountsExist();
-      } else {
-        // Merge giữ nguyên mật khẩu cục bộ và không đánh mất tài khoản mới trên Server
-        const localMap = {};
-        systemUsers.forEach(u => {
-          if (u && u.username) localMap[u.username.toLowerCase()] = u;
-        });
-        systemUsers = incomingUsers.map(inc => {
-          const loc = inc && inc.username ? localMap[inc.username.toLowerCase()] : null;
-          return loc ? { ...inc, pass: loc.pass } : inc;
-        });
-      }
-
-      localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-
-      if (loggedUser && loggedUser.role === 'admin') {
-        if (typeof renderAdminUsersTable === 'function') renderAdminUsersTable();
-        if (typeof renderCodoAssignTable === 'function') renderCodoAssignTable();
-      }
-    }
     // ĐỒNG BỘ PHÂN CÔNG CỜ ĐỎ ĐỘC LẬP (CHỐNG DRIVE ĐÈ NGƯỢC TRONG 25 GIÂY SAU KHI CHỐT)
     const lastCodoSave = parseInt(localStorage.getItem('yka_last_codo_save') || '0', 10);
     if (db.codoAssign && typeof db.codoAssign === 'object' && (Date.now() - lastCodoSave > 25000)) {
@@ -4318,6 +4354,15 @@ const DEFAULT_RULES = [
   { code: 'B11', name: 'Mang hung khí, vật cấm vào trường', point: -100, group: 'tnxk' },
   { code: 'B12', name: 'Bị Công an/địa phương gửi văn bản vi phạm', point: -100, group: 'tnxk' },
 
+  // === NHÓM S: SỔ ĐẦU BÀI (Lỗi vi phạm trong giờ học) ===
+  { code: 'S01', name: 'Ngủ gật, gục xuống bàn trong giờ học', point: -5, group: 'sdb' },
+  { code: 'S02', name: 'Không làm bài tập, không học bài cũ', point: -5, group: 'sdb' },
+  { code: 'S03', name: 'Nói chuyện riêng, làm việc riêng gây mất trật tự trong giờ học', point: -5, group: 'sdb' },
+  { code: 'S04', name: 'Không mang sách vở, dụng cụ học tập theo yêu cầu bộ môn', point: -5, group: 'sdb' },
+  { code: 'S05', name: 'Ăn quà vặt trong lớp trong giờ học', point: -10, group: 'sdb' },
+  { code: 'S06', name: 'Sử dụng điện thoại / thiết bị điện tử trái phép trong giờ học', point: -20, group: 'sdb' },
+  { code: 'S07', name: 'Vô lễ, thiếu tôn trọng giáo viên bộ môn trong giờ học', point: -30, group: 'sdb' },
+
   // === NHÓM C: BCH ĐOÀN (Cộng điểm thưởng) ===
   { code: 'C01', name: 'Hoàn thành xuất sắc nhiệm vụ Đoàn giao', point: 2, group: 'bch', target: 'personal' },
   { code: 'C02', name: 'Người tốt, việc tốt (Nhặt được của rơi trả lại)', point: 2, group: 'bch', target: 'personal' },
@@ -4331,7 +4376,16 @@ const DEFAULT_RULES = [
 ];
 
 // Chuyển thành biến let để có thể thay đổi được. Ưu tiên lấy từ cấu hình, nếu không có thì lấy Mặc định
-let RULES = JSON.parse(localStorage.getItem('yka_rules_v1')) || DEFAULT_RULES;
+function ensureDefaultSdbRules(rulesArr) {
+  if (!Array.isArray(rulesArr)) return DEFAULT_RULES;
+  if (!rulesArr.some(r => r && r.group === 'sdb') && !localStorage.getItem('yka_sdb_rules_customized_v1')) {
+    const existingCodes = new Set(rulesArr.map(r => String(r.code || '').toUpperCase()));
+    const sdbDefaults = DEFAULT_RULES.filter(r => r.group === 'sdb' && !existingCodes.has(r.code.toUpperCase()));
+    return [...rulesArr, ...sdbDefaults];
+  }
+  return rulesArr;
+}
+let RULES = ensureDefaultSdbRules(JSON.parse(localStorage.getItem('yka_rules_v1')) || DEFAULT_RULES);
 // Hàm 1: Lưu cấu hình Tiêu chí lên Google Drive (Đã thêm no-cors và trạng thái nút)
 // Hàm 1: Lưu cấu hình Tiêu chí lên Google Drive (Đã thêm no-cors và trạng thái nút)
 async function saveRulesToCloud() {
@@ -4397,6 +4451,7 @@ function renderRulesConfigTable() {
     let groupBadge = '';
     if (r.group === 'codo') groupBadge = '<span class="badge badge-warning">Cờ Đỏ</span>';
     else if (r.group === 'tnxk') groupBadge = '<span class="badge badge-danger">TNXK</span>';
+    else if (r.group === 'sdb') groupBadge = '<span class="badge badge-info">SĐB (Giờ học)</span>';
     else if (r.group === 'bch') groupBadge = '<span class="badge badge-success">BCH Đoàn</span>';
 
     const tr = document.createElement('tr');
@@ -4429,9 +4484,10 @@ function saveRuleConfig() {
     alert("Vui lòng nhập đầy đủ Mã, Nội dung và Mức điểm!"); return;
   }
 
-  // Tự động chuyển thành điểm âm nếu là Cờ đỏ / TNXK
+  // Tự động chuyển thành điểm âm nếu là Cờ đỏ / TNXK / SĐB
   let finalPoint = Math.abs(ptInput);
-  if (group === 'codo' || group === 'tnxk') finalPoint = -finalPoint;
+  if (group === 'codo' || group === 'tnxk' || group === 'sdb') finalPoint = -finalPoint;
+  if (group === 'sdb') localStorage.setItem('yka_sdb_rules_customized_v1', '1');
 
   if (editingRuleCode) {
     // ĐANG Ở CHẾ ĐỘ SỬA
@@ -4493,6 +4549,8 @@ function cancelEditRule() {
 // Hàm 4: Chức năng Xóa tiêu chí
 function deleteRule(code) {
   if (confirm(`Bạn có chắc muốn xóa tiêu chí [${code}] khỏi hệ thống?`)) {
+    const target = RULES.find(r => r.code === code);
+    if (target && target.group === 'sdb') localStorage.setItem('yka_sdb_rules_customized_v1', '1');
     RULES = RULES.filter(r => r.code !== code);
     renderRulesConfigTable();
   }
@@ -4544,20 +4602,6 @@ function generateDefaultUsers() {
 
 let systemUsers = JSON.parse(localStorage.getItem('yka_system_users_v1')) || generateDefaultUsers();
 let loggedUser = null;
-// Cờ bảo vệ chống ghi đè ngược mật khẩu mặc định lên db_users.json
-let hasVerifiedCloudUsers = false;
-
-function backupSystemUsersLocally(usersArr) {
-  if (!Array.isArray(usersArr) || usersArr.length < 2) return;
-  const hasRealAdminPass = usersArr.some(u => u.username === 'admin' && u.pass && String(u.pass).trim() !== '');
-  if (!hasRealAdminPass) return;
-  try {
-    localStorage.setItem('yka_users_backup_v1', JSON.stringify({
-      savedAt: new Date().toLocaleString('vi-VN'),
-      users: usersArr
-    }));
-  } catch (e) {}
-}
 // ==================== KHO PHÂN CÔNG CỜ ĐỎ ĐỘC LẬP ====================
 let codoAssignMap = JSON.parse(localStorage.getItem('yka_codo_assign_v1')) || {};
 
@@ -4802,13 +4846,8 @@ function connectMqtt() {
         }
         else if (payload.action === 'UPDATE_ALL_USERS') {
           if (Array.isArray(payload.data) && payload.data.length > 1) {
-            const mqttSanitized = payload.data.some(u => u.username === 'admin' && (!u.pass || String(u.pass).trim() === ''));
-            if (!mqttSanitized) {
-              systemUsers = payload.data;
-              hasVerifiedCloudUsers = true;
-              backupSystemUsersLocally(systemUsers);
-              localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-            }
+            systemUsers = payload.data;
+            localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
             // Nếu đang là Cờ đỏ và được Admin mở khóa từ xa -> Mở lại ô chọn lớp ngay lập tức
             if (loggedUser && loggedUser.role === 'codo') {
               const myUpdated = systemUsers.find(u => u.username.toLowerCase() === loggedUser.username.toLowerCase());
@@ -4915,7 +4954,10 @@ function connectMqtt() {
         renderLeaderboard();
         if(typeof renderCodoLogsTable === 'function') renderCodoLogsTable();
         if(typeof renderTnxkLogsTable === 'function') renderTnxkLogsTable();
+        if(typeof renderSdbViolationsTable === 'function') renderSdbViolationsTable();
+        if(typeof recalcSdbFull === 'function') recalcSdbFull();
         if(typeof renderReviewTable === 'function') renderReviewTable();
+        if(typeof renderV5Dashboard === 'function') renderV5Dashboard();
         updatePendingBadge();
      } catch (e) { console.error("Lỗi đọc tin MQTT", e); }
     }
@@ -4950,6 +4992,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('codoDateInput').value = new Date().toISOString().split('T')[0];
   document.getElementById('tnxkDateInput').value = new Date().toISOString().split('T')[0];
   document.getElementById('sdbAbsenceDate').value = new Date().toISOString().split('T')[0];
+  if (document.getElementById('sdbViolDate')) document.getElementById('sdbViolDate').value = new Date().toISOString().split('T')[0];
 
   const codoSel = document.getElementById('codoClassSelect');
   if (codoSel) codoSel.addEventListener('change', (e) => updateStudentDatalist(e.target.value));
@@ -5017,21 +5060,37 @@ async function handleLoginSubmit(e) {
 
   try {
     // ====================================================================
-    // XÁC THỰC TRỰC TIẾP VỚI SERVER (KỂ CẢ ADMIN) ĐỂ TẢI ĐÚNG MẬT KHẨU THẬT TỪ DRIVE
+    // 🛠 CỨU HỘ KHẨN CẤP ĐẶC QUYỀN ADMIN: BỎ QUA MÁY CHỦ NẾU FILE BỊ LỖI
+    // ====================================================================
+    if (uLower === 'admin') {
+      const passHash = await sha256Hash(p);
+      const defaultAdminHash = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"; // Mã băm của admin123
+      const localFound = systemUsers.find(user => user.username.toLowerCase() === 'admin');
+      
+      // Nếu nhập đúng admin123 HOẶC mật khẩu đã lưu trên máy -> Cho vào thẳng luôn!
+      if (p === 'admin123' || passHash === defaultAdminHash || (localFound && localFound.pass === p)) {
+        loggedUser = localFound || { username: 'admin', name: 'Bí thư Đoàn Trường', role: 'admin', scope: CLASSES.map(c => c.id) };
+        loggedUser.pass = p;
+        sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
+        document.getElementById('loginScreen').style.display = 'none';
+        setupUserSessionUI();
+        
+        //alert('🛠️ ĐĂNG NHẬP CỨU HỘ THÀNH CÔNG!\nThầy vui lòng vào Tab "Quản lý Tài khoản", gõ lại mật khẩu cho Admin và bấm "Lưu Thiết Lập Tài Khoản" để sửa file trên Google Drive nhé!');
+        return;
+      }
+    }
+
+    // ====================================================================
+    // XÁC THỰC TRỰC TIẾP VỚI SERVER ĐỂ KHÔNG BAO GIỜ LỆCH MẬT KHẨU KHI LƯU
     // ====================================================================
     let loggedInUser = null;
     let serverReachable = false;
 
     const applyServerLoginPayload = (res) => {
       loggedInUser = res.user;
-      if (res.allUsers && Array.isArray(res.allUsers) && res.allUsers.length > 1) {
-        const isSanitized = res.allUsers.some(usr => usr.username === 'admin' && (!usr.pass || String(usr.pass).trim() === ''));
-        if (!isSanitized) {
-          systemUsers = res.allUsers;
-          hasVerifiedCloudUsers = true;
-          backupSystemUsersLocally(systemUsers);
-          localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
-        }
+      if (res.allUsers && Array.isArray(res.allUsers)) {
+        systemUsers = res.allUsers;
+        localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
       }
       if (res.codoAssign && typeof res.codoAssign === 'object') {
         codoAssignMap = res.codoAssign;
@@ -5066,17 +5125,10 @@ async function handleLoginSubmit(e) {
       }
     }
 
-    // Chỉ dự phòng bộ nhớ máy / cứu hộ Admin khi thực sự mất mạng (và khóa quyền ghi đè db_users.json)
+    // Chỉ dự phòng bộ nhớ máy khi thực sự mất mạng (không cho dùng mật khẩu mặc định vượt mặt Server)
     if (!loggedInUser && !serverReachable) {
       const localFound = systemUsers.find(user => user.username.toLowerCase() === uLower);
-      if (uLower === 'admin') {
-        const passHash = await sha256Hash(p);
-        const defaultAdminHash = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
-        if (p === 'admin123' || passHash === defaultAdminHash || (localFound && localFound.pass === p)) {
-          loggedInUser = localFound || { username: 'admin', name: 'Bí thư Đoàn Trường', role: 'admin', scope: CLASSES.map(c => c.id) };
-          hasVerifiedCloudUsers = false;
-        }
-      } else if (localFound && localFound.pass && p === localFound.pass) {
+      if (localFound && localFound.pass && p === localFound.pass) {
         loggedInUser = localFound;
       }
     }
@@ -5091,9 +5143,6 @@ async function handleLoginSubmit(e) {
     sessionStorage.setItem('yka_current_user_v1', JSON.stringify(loggedUser));
     document.getElementById('loginScreen').style.display = 'none';
     setupUserSessionUI();
-    if (loggedUser.role === 'admin' && !hasVerifiedCloudUsers) {
-      fetchDatabaseFromCloud(true);
-    }
 
   } finally {
     if (submitBtn) {
@@ -5304,6 +5353,7 @@ function getMetricLabel(metric, threshold) {
     case 'total_violations':   return `Tổng số lượt vi phạm >= <strong>${threshold}</strong> lần`;
     case 'traffic_violations': return `Số lần vi phạm ATGT (Nhóm B) >= <strong>${threshold}</strong> lần`;
     case 'discipline_violations': return `Số lần VP Nề nếp (Nhóm A) >= <strong>${threshold}</strong> lần`;
+    case 'sdb_violations':     return `Số lần VP Giờ học (SĐB) >= <strong>${threshold}</strong> lần`;
     case 'specific_code':      return `Mắc mã lỗi cụ thể: <strong>[${threshold}]</strong>`;
     default: return `${metric}: ${threshold}`;
   }
@@ -5592,9 +5642,10 @@ function isRuleTriggered(studentRec, rule, netPenalty) {
     case 'excused_absences':   return studentRec.excusedAbsences >= val;
     case 'net_penalty':        return netPenalty > val;
     case 'single_point':       return studentRec.maxSinglePenalty >= val;
-    case 'total_violations':   return (studentRec.disciplineViolations + studentRec.trafficViolations) >= val;
+    case 'total_violations':   return (studentRec.disciplineViolations + studentRec.trafficViolations + (studentRec.sdbViolations || 0)) >= val;
     case 'traffic_violations': return studentRec.trafficViolations >= val;
     case 'discipline_violations': return studentRec.disciplineViolations >= val;
+    case 'sdb_violations':     return (studentRec.sdbViolations || 0) >= val;
     case 'specific_code': {
       const codes = rule.threshold.split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
       return studentRec.violatedCodes.some(c => codes.includes(c));
@@ -5613,7 +5664,7 @@ function computeSingleTermStudentRecords(term) {
   STUDENTS_DB.forEach(s => {
     recordMap[s.id] = {
       stt: s.stt, classId: s.classId, id: s.id, name: s.name, dob: s.dob, gender: s.gender,
-      excusedAbsences: 0, unexcusedAbsences: 0, disciplineViolations: 0, trafficViolations: 0,
+      excusedAbsences: 0, unexcusedAbsences: 0, disciplineViolations: 0, trafficViolations: 0, sdbViolations: 0,
       maxSinglePenalty: 0, violatedCodes: [],
       totalPenalties: 0, totalBonuses: 0, details: []
     };
@@ -5632,7 +5683,9 @@ function computeSingleTermStudentRecords(term) {
       if (absPt > rec.maxSinglePenalty) rec.maxSinglePenalty = absPt;
       if (v.code) rec.violatedCodes.push(v.code.toUpperCase());
 
-      if (v.code.startsWith('B') || v.name.toLowerCase().includes('xe') || v.name.toLowerCase().includes('mũ')) {
+      if (isSdbViolationRecord(v)) {
+        rec.sdbViolations += 1;
+      } else if (v.code.startsWith('B') || v.name.toLowerCase().includes('xe') || v.name.toLowerCase().includes('mũ')) {
         rec.trafficViolations += 1;
       } else {
         rec.disciplineViolations += 1;
@@ -5640,7 +5693,7 @@ function computeSingleTermStudentRecords(term) {
     } else {
       rec.totalBonuses += v.points;
     }
-    rec.details.push(`[${v.date}] [${v.code}] ${v.name} (${v.points > 0 ? '+' : ''}${v.points}đ)`);
+    rec.details.push(`[${getViolationSourceLabel(v)} ${v.date}] [${v.code}] ${v.name} (${v.points > 0 ? '+' : ''}${v.points}đ)`);
   });
 
   // 2. Quét dữ liệu nghỉ học SĐB (Chỉ tính vào học sinh có thật trong danh sách gốc)
@@ -5728,12 +5781,12 @@ function computeHk1StudentRecords() {
 
   return allKeys.map(key => {
     const r1 = hk1Map[key] || {
-      excusedAbsences: 0, unexcusedAbsences: 0, disciplineViolations: 0, trafficViolations: 0,
+      excusedAbsences: 0, unexcusedAbsences: 0, disciplineViolations: 0, trafficViolations: 0, sdbViolations: 0,
       maxSinglePenalty: 0, violatedCodes: [], totalPenalties: 0, totalBonuses: 0, details: [],
       finalScoreNum: cfg.weeklyBaseScore, rank: 'Tốt', controlNote: ''
     };
     const r2 = hk2Map[key] || {
-      excusedAbsences: 0, unexcusedAbsences: 0, disciplineViolations: 0, trafficViolations: 0,
+      excusedAbsences: 0, unexcusedAbsences: 0, disciplineViolations: 0, trafficViolations: 0, sdbViolations: 0,
       maxSinglePenalty: 0, violatedCodes: [], totalPenalties: 0, totalBonuses: 0, details: [],
       finalScoreNum: cfg.weeklyBaseScore, rank: 'Tốt', controlNote: ''
     };
@@ -5750,6 +5803,7 @@ function computeHk1StudentRecords() {
       unexcusedAbsences: r1.unexcusedAbsences + r2.unexcusedAbsences,
       disciplineViolations: r1.disciplineViolations + r2.disciplineViolations,
       trafficViolations: r1.trafficViolations + r2.trafficViolations,
+      sdbViolations: (r1.sdbViolations || 0) + (r2.sdbViolations || 0),
       maxSinglePenalty: Math.max(r1.maxSinglePenalty, r2.maxSinglePenalty),
       violatedCodes: [...r1.violatedCodes, ...r2.violatedCodes],
       totalPenalties: r1.totalPenalties + r2.totalPenalties,
@@ -5856,7 +5910,7 @@ function renderHk1SummaryTable() {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Không tìm thấy học sinh nào theo điều kiện lọc.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Không tìm thấy học sinh nào theo điều kiện lọc.</td></tr>';
     return;
   }
 
@@ -5881,6 +5935,7 @@ function renderHk1SummaryTable() {
       <td style="text-align:center; font-weight:bold; color:${r.unexcusedAbsences > 0 ? 'var(--danger)' : 'inherit'};">${r.unexcusedAbsences}</td>
       <td style="text-align:center; color:${r.disciplineViolations > 0 ? 'var(--danger)' : 'inherit'};">${r.disciplineViolations}</td>
       <td style="text-align:center; color:${r.trafficViolations > 0 ? 'var(--danger)' : 'inherit'};">${r.trafficViolations}</td>
+      <td style="text-align:center; font-weight:bold; color:${(r.sdbViolations || 0) > 0 ? 'var(--primary)' : 'inherit'};">${r.sdbViolations || 0}</td>
       <td style="text-align:center; font-weight:bold;">
         <span style="color:${r.totalPenalties > 0 ? 'var(--danger)' : 'var(--text-muted)'};">-${r.totalPenalties}đ</span>
         ${r.totalBonuses > 0 ? ` / <span style="color:var(--success);">+${r.totalBonuses}đ</span>` : ''}
@@ -5903,16 +5958,16 @@ function exportHk1Excel() {
   const filtered = records.filter(r => classFilter === 'ALL' || r.classId === classFilter);
 
   let csv = term === 'YEAR'
-    ? `\uFEFFSTT,Lớp,Mã học sinh,Họ và tên,Ngày sinh,Giới tính,Nghỉ có phép,Nghỉ không phép,Lượt VP Nề nếp,Lượt VP ATGT,Tổng điểm trừ,Tổng điểm cộng,ĐTB Rèn luyện,Xếp loại HK1,Xếp loại HK2,Xếp loại Cả Năm (TT22),Chi tiết vi phạm & Ghi chú\n`
-    : `\uFEFFSTT,Lớp,Mã học sinh,Họ và tên,Ngày sinh,Giới tính,Nghỉ có phép,Nghỉ không phép,Lượt VP Nề nếp,Lượt VP ATGT,Tổng điểm trừ,Tổng điểm cộng,ĐTB Rèn luyện (${term}),Xếp loại (${term}),Chi tiết vi phạm & Ghi chú khống chế\n`;
+    ? `\uFEFFSTT,Lớp,Mã học sinh,Họ và tên,Ngày sinh,Giới tính,Nghỉ có phép,Nghỉ không phép,Lượt VP Nề nếp,Lượt VP ATGT,Lượt VP Giờ học (SĐB),Tổng điểm trừ,Tổng điểm cộng,ĐTB Rèn luyện,Xếp loại HK1,Xếp loại HK2,Xếp loại Cả Năm (TT22),Chi tiết vi phạm & Ghi chú\n`
+    : `\uFEFFSTT,Lớp,Mã học sinh,Họ và tên,Ngày sinh,Giới tính,Nghỉ có phép,Nghỉ không phép,Lượt VP Nề nếp,Lượt VP ATGT,Lượt VP Giờ học (SĐB),Tổng điểm trừ,Tổng điểm cộng,ĐTB Rèn luyện (${term}),Xếp loại (${term}),Chi tiết vi phạm & Ghi chú khống chế\n`;
 
   filtered.forEach((r, idx) => {
     const fullNote = r.details.join('; ') + (r.controlNote ? ` [${r.controlNote}]` : '');
     const detailSanitized = `"${fullNote.replace(/"/g, '""')}"`;
     if (term === 'YEAR') {
-      csv += `${idx + 1},${r.classId},${r.id},"${r.name}",${r.dob},${r.gender},${r.excusedAbsences},${r.unexcusedAbsences},${r.disciplineViolations},${r.trafficViolations},-${r.totalPenalties},+${r.totalBonuses},${r.finalScore},${r.rankHk1 || ''},${r.rankHk2 || ''},${r.rank},${detailSanitized}\n`;
+      csv += `${idx + 1},${r.classId},${r.id},"${r.name}",${r.dob},${r.gender},${r.excusedAbsences},${r.unexcusedAbsences},${r.disciplineViolations},${r.trafficViolations},${r.sdbViolations || 0},-${r.totalPenalties},+${r.totalBonuses},${r.finalScore},${r.rankHk1 || ''},${r.rankHk2 || ''},${r.rank},${detailSanitized}\n`;
     } else {
-      csv += `${idx + 1},${r.classId},${r.id},"${r.name}",${r.dob},${r.gender},${r.excusedAbsences},${r.unexcusedAbsences},${r.disciplineViolations},${r.trafficViolations},-${r.totalPenalties},+${r.totalBonuses},${r.finalScore},${r.rank},${detailSanitized}\n`;
+      csv += `${idx + 1},${r.classId},${r.id},"${r.name}",${r.dob},${r.gender},${r.excusedAbsences},${r.unexcusedAbsences},${r.disciplineViolations},${r.trafficViolations},${r.sdbViolations || 0},-${r.totalPenalties},+${r.totalBonuses},${r.finalScore},${r.rank},${detailSanitized}\n`;
     }
   });
 
@@ -6159,12 +6214,7 @@ function calculateHk1ClassScores() {
       bClass: c.bClass || 'badge-info',
       statusNote: statusNote
     };
-  }).filter(c => gradeFilter === 'ALL' || c.grade === gradeFilter)
-    .sort((a, b) => {
-      const diff = normClassScore(a.remainingPenalty) - normClassScore(b.remainingPenalty);
-      if (diff !== 0) return diff;
-      return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
-    });
+  }).filter(c => gradeFilter === 'ALL' || c.grade === gradeFilter);
 }
 
 function renderHk1ClassTable() {
@@ -6189,8 +6239,7 @@ function renderHk1ClassTable() {
   list.forEach((c, idx) => {
     if (idx > 0) {
       const prev = list[idx - 1];
-      // Chỉ xét duy nhất Tổng điểm tích lũy (remainingPenalty): Bằng điểm xếp đồng hạng
-      if (normClassScore(c.remainingPenalty) !== normClassScore(prev.remainingPenalty)) {
+      if (c.termRank !== prev.termRank || c.remainingPenalty !== prev.remainingPenalty || c.counts['Xuất sắc'] !== prev.counts['Xuất sắc']) {
         currentRank = idx + 1;
       }
     }
@@ -6236,13 +6285,9 @@ function exportHk1ClassExcel() {
   const term = document.getElementById('hk1ClassFilterTerm') ? document.getElementById('hk1ClassFilterTerm').value : 'HK1';
   const list = calculateHk1ClassScores();
   let csv = "\uFEFFHạng,Chi đoàn,Sĩ số,Số tuần Xuất Sắc,Số tuần Tốt,Số tuần Khá,Số tuần Đạt,Số tuần Chưa Đạt,Tổng điểm trừ tích lũy,Xếp loại Tập Thể\n";
-  let currentRank = 1;
   list.forEach((c, idx) => {
-    if (idx > 0 && normClassScore(c.remainingPenalty) !== normClassScore(list[idx - 1].remainingPenalty)) {
-      currentRank = idx + 1;
-    }
     const penStr = c.remainingPenalty <= 0 ? `+${Math.abs(c.remainingPenalty)}` : `-${c.remainingPenalty}`;
-    csv += `${currentRank},Chi đoàn ${c.id},${c.size},${c.counts['Xuất sắc']},${c.counts['Tốt']},${c.counts['Khá']},${c.counts['Đạt']},${c.counts['Chưa đạt']},${penStr},${c.termRank}\n`;
+    csv += `${idx + 1},Chi đoàn ${c.id},${c.size},${c.counts['Xuất sắc']},${c.counts['Tốt']},${c.counts['Khá']},${c.counts['Đạt']},${c.counts['Chưa đạt']},${penStr},${c.termRank}\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement("a");
@@ -6285,7 +6330,7 @@ function switchTab(tabId) {
   if (tabId === 'history') renderHistoryTable();
   if (tabId === 'admin-users') {
     renderAdminUsersTable();
-    fetchDatabaseFromCloud(true); // Ép kéo mật khẩu thật mới nhất từ Google Drive về
+    fetchDatabaseFromCloud(); // Tự động kéo mật khẩu mới nhất từ Google Drive về
   }
 }
 
@@ -6311,6 +6356,18 @@ function initRuleSelects() {
       opt.value = r.code;
       opt.textContent = `[${r.code}] ${r.name} (${r.point}đ)`;
       tnxkSel.appendChild(opt);
+    });
+  }
+
+  // SỔ ĐẦU BÀI: LỖI VI PHẠM TRONG GIỜ HỌC
+  const sdbViolSel = document.getElementById('sdbViolRuleSelect');
+  if (sdbViolSel) {
+    sdbViolSel.innerHTML = '<option value="">-- Chọn lỗi vi phạm trong giờ học (SĐB) --</option>';
+    RULES.filter(r => r.group === 'sdb').forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.code;
+      opt.textContent = `[${r.code}] ${r.name} (${r.point}đ)`;
+      sdbViolSel.appendChild(opt);
     });
   }
 
@@ -6360,6 +6417,178 @@ function openImgModal(src) {
 }
 function closeImgModal() {
   document.getElementById('imgModal').classList.remove('open');
+}
+
+// ==================== NHẬN DIỆN & XỬ LÝ LỖI VI PHẠM GIỜ HỌC (SĐB) ====================
+function isSdbViolationRecord(v) {
+  if (!v) return false;
+  if (v.source === 'sdb' || v.group === 'sdb') return true;
+  if (v.recorder && String(v.recorder).includes('SĐB')) return true;
+  const matchedRule = RULES.find(r => r.code === v.code);
+  if (matchedRule && matchedRule.group === 'sdb') return true;
+  return false;
+}
+
+function getViolationSourceLabel(v) {
+  if (!v) return '';
+  if (v.points > 0) return 'BCH';
+  if (isSdbViolationRecord(v)) return 'SĐB';
+  if (v.recorder && String(v.recorder).includes('TNXK')) return 'TNXK';
+  if (v.recorder && String(v.recorder).includes('Tố giác')) return 'Tố giác';
+  return 'Cờ đỏ';
+}
+
+function onSdbViolRuleChange() {
+  const code = document.getElementById('sdbViolRuleSelect').value;
+  const r = RULES.find(rule => rule.code === code);
+  const baseEl = document.getElementById('sdbViolBasePointDisplay');
+  if (baseEl) baseEl.value = r ? `${r.point} điểm` : '';
+  calcSdbViolPoints();
+}
+
+function calcSdbViolPoints() {
+  const code = document.getElementById('sdbViolRuleSelect').value;
+  const mult = parseInt(document.getElementById('sdbViolMultSelect').value) || 1;
+  const r = RULES.find(rule => rule.code === code);
+  const ptEl = document.getElementById('sdbViolFinalPointInput');
+  if (ptEl) ptEl.value = r ? (r.point * mult) : '';
+}
+
+async function handleSdbViolationSubmit() {
+  if (!loggedUser) return;
+  const targetClass = (loggedUser.role === 'admin')
+    ? document.getElementById('adminSdbClassSelect').value
+    : loggedUser.sdbClass;
+
+  if (!targetClass) {
+    alert('⚠️ Chưa xác định được Chi đoàn!');
+    return;
+  }
+  if (loggedUser.role === 'sdb' && targetClass !== loggedUser.sdbClass) {
+    alert('⛔ LỖI PHÂN QUYỀN: Bạn chỉ được ghi nhận lỗi cho lớp mình phụ trách!');
+    return;
+  }
+
+  const date = document.getElementById('sdbViolDate').value;
+  const student = document.getElementById('sdbViolStudentInput').value.trim();
+  const code = document.getElementById('sdbViolRuleSelect').value;
+  const mult = parseInt(document.getElementById('sdbViolMultSelect').value) || 1;
+  const evidence = document.getElementById('sdbViolEvidenceInput').value.trim();
+  const fileInput = document.getElementById('sdbViolImageEvidence');
+  const rule = RULES.find(r => r.code === code);
+
+  if (!date || !student || !rule || !evidence) {
+    alert('⚠️ Vui lòng nhập đầy đủ: Ngày, Họ tên học sinh, Hành vi vi phạm và Ghi chú tiết/môn học!');
+    return;
+  }
+
+  const btn = document.getElementById('btnAddSdbViolation');
+  const oldBtnHtml = btn ? btn.innerHTML : '➕ Lưu Lỗi Giờ Học';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Đang lưu...'; }
+
+  try {
+    let finalImageUrl = '';
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+      if (btn) btn.innerHTML = '⏳ Đang tải ảnh SĐB...';
+      finalImageUrl = await uploadImageToDrive(fileInput.files[0], 'SDB', targetClass);
+    }
+
+    const newV = {
+      id: Date.now(),
+      date: date,
+      classId: targetClass,
+      student: student,
+      code: rule.code,
+      name: rule.name,
+      points: rule.point * mult,
+      mult: mult,
+      recorder: (loggedUser.name && loggedUser.name.includes('SĐB')) ? loggedUser.name : `SĐB - ${loggedUser.name}`,
+      evidence: `[SĐB Giờ học]: ${evidence}`,
+      linkEvidence: '',
+      imageEvidence: finalImageUrl,
+      status: 'Đã duyệt',
+      source: 'sdb',
+      group: 'sdb'
+    };
+
+    violations.push(newV);
+    appendSingleViolationToCloud(newV);
+    if (mqttClient && mqttClient.connected) {
+      publishUpdate('NEW_VIOLATION', newV);
+    }
+
+    document.getElementById('sdbViolStudentInput').value = '';
+    document.getElementById('sdbViolEvidenceInput').value = '';
+    document.getElementById('sdbViolMultSelect').value = '1';
+    if (fileInput) fileInput.value = '';
+    const prevBox = document.getElementById('sdbViolImgPreview');
+    if (prevBox) prevBox.innerHTML = '';
+    calcSdbViolPoints();
+
+    renderSdbViolationsTable();
+    recalcSdbFull();
+    renderLeaderboard();
+    renderReviewTable();
+    renderStudentSearchTable();
+    renderAlerts();
+    if (typeof renderHk1SummaryTable === 'function') renderHk1SummaryTable();
+    if (typeof renderV5Dashboard === 'function') renderV5Dashboard();
+    if (loggedUser.role === 'admin') renderAdminSdbOverviewTable();
+    updatePendingBadge();
+
+    alert(`✅ Đã ghi nhận và tự động duyệt lỗi giờ học [${rule.code}] cho HS ${student} (Lớp ${targetClass})!`);
+  } catch (err) {
+    alert('❌ Lỗi khi lưu biên bản SĐB: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = oldBtnHtml; }
+  }
+}
+
+function renderSdbViolationsTable() {
+  const tbody = document.getElementById('sdbViolationsListBody');
+  if (!tbody || !loggedUser) return;
+  tbody.innerHTML = '';
+
+  const targetClass = (loggedUser.role === 'admin')
+    ? (document.getElementById('adminSdbClassSelect') ? document.getElementById('adminSdbClassSelect').value : CLASSES[0].id)
+    : loggedUser.sdbClass;
+
+  const weekSel = document.getElementById('inputWeekSelect_sdb');
+  const isFinalized = (weekSel && weekSel.selectedOptions[0]) ? (weekSel.selectedOptions[0].dataset.finalized === 'true') : false;
+  const fromD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.from : null;
+  const toD = (weekSel && weekSel.selectedOptions[0]) ? weekSel.selectedOptions[0].dataset.to : null;
+
+  const list = violations.filter(v => {
+    if (v.classId !== targetClass || !isSdbViolationRecord(v) || v.status === 'Đã hủy') return false;
+    if (fromD && toD) return v.date >= fromD && v.date <= toD;
+    return !v.isArchived;
+  }).reverse();
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1rem; color:var(--text-muted);">Chi đoàn chưa có học sinh nào vi phạm trong giờ học tuần này.</td></tr>`;
+    return;
+  }
+
+  list.forEach(v => {
+    const tr = document.createElement('tr');
+    const actionHtml = (loggedUser.role === 'admin' && !isFinalized)
+      ? `<button type="button" class="btn btn-outline btn-sm" onclick="deleteViolationPermanently(${v.id})" style="color:var(--danger);" title="Xóa biên bản">✕</button>`
+      : `<span style="font-size:0.72rem; color:var(--text-muted);">${isFinalized ? 'Đã chốt' : 'Đối soát ở Tab Duyệt'}</span>`;
+
+    tr.innerHTML = `
+      <td>${v.date}</td>
+      <td><strong>${v.student}</strong></td>
+      <td><span style="color:var(--danger); font-weight:600;">[${v.code}]</span> ${v.name}</td>
+      <td style="text-align:center; font-weight:bold; color:var(--danger);">${v.points} đ</td>
+      <td style="font-size:0.8rem;">
+        <div>${v.evidence || '--'}</div>
+        ${v.imageEvidence ? `<div style="margin-top:0.25rem;"><img src="${getDirectDriveImgUrl(v.imageEvidence)}" class="evidence-img-thumb" onclick="openImgModal('${v.imageEvidence}')" title="Xem ảnh SĐB"></div>` : ''}
+      </td>
+      <td style="text-align:center;"><span class="badge ${v.status === 'Đã duyệt' ? 'badge-success' : 'badge-warning'}">${v.status}</span></td>
+      <td style="text-align:center;">${actionHtml}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
 // ==================== PHẦN SỔ ĐẦU BÀI (SĐB) ====================
@@ -6431,7 +6660,7 @@ function setupSdbForm() {
   document.getElementById('sdbCountMedScores').value = data.medScores || 0;
   document.getElementById('sdbCountPoorScores').value = data.poorScores || 0;
    // Khóa Form nếu là tuần đã chốt (Chỉ cho xem, không cho sửa)
-  const inputsToLock = ['sdbTotalInput', 'sdbGoodInput', 'sdbFairInput', 'sdbMedInput', 'sdbWeakInput', 'sdbPoorInput', 'sdbCountGoodScores', 'sdbCountGvcnScores', 'sdbCountFairScores', 'sdbCountMedScores', 'sdbCountPoorScores', 'sdbAbsenceDate', 'sdbAbsenceStudentName', 'sdbAbsenceType', 'sdbAbsenceReason'];
+  const inputsToLock = ['sdbTotalInput', 'sdbGoodInput', 'sdbFairInput', 'sdbMedInput', 'sdbWeakInput', 'sdbPoorInput', 'sdbCountGoodScores', 'sdbCountGvcnScores', 'sdbCountFairScores', 'sdbCountMedScores', 'sdbCountPoorScores', 'sdbAbsenceDate', 'sdbAbsenceStudentName', 'sdbAbsenceType', 'sdbAbsenceReason', 'sdbViolDate', 'sdbViolStudentInput', 'sdbViolRuleSelect', 'sdbViolMultSelect', 'sdbViolEvidenceInput', 'sdbViolImageEvidence'];
   inputsToLock.forEach(id => {
      const el = document.getElementById(id);
      if (el) el.disabled = isFinalized;
@@ -6439,11 +6668,18 @@ function setupSdbForm() {
   
   const btnAdd = document.querySelector('button[onclick="addSdbAbsenceItem()"]');
   if (btnAdd) btnAdd.style.display = isFinalized ? 'none' : 'inline-flex';
+
+  const btnAddViol = document.getElementById('btnAddSdbViolation');
+  if (btnAddViol) btnAddViol.style.display = isFinalized ? 'none' : 'inline-flex';
+
+  const violDateInp = document.getElementById('sdbViolDate');
+  if (violDateInp && !violDateInp.value) violDateInp.value = new Date().toISOString().split('T')[0];
   
   const btnSave = document.getElementById('btnSaveSdbData');
   if (btnSave) btnSave.style.display = isFinalized ? 'none' : 'block';
   updateStudentDatalist(targetClass);
   renderSdbAbsenceList();
+  renderSdbViolationsTable();
   recalcSdbFull();
 }
 
@@ -6566,12 +6802,21 @@ function recalcSdbFull() {
       const validGvcnCount = Math.min(gvcnCount, maxGvcn);
       const academicBalance = (goodCount * goodPt) + (validGvcnCount * goodPt) - (poorCount * poorPt);
 
+      let sdbViolPenalty = 0;
+      violations.filter(v => {
+        if (v.classId !== targetClass || v.status !== 'Đã duyệt' || !isSdbViolationRecord(v) || v.points >= 0) return false;
+        if (fromD && toD) return v.date >= fromD && v.date <= toD;
+        return !v.isArchived;
+      }).forEach(v => sdbViolPenalty += Math.abs(v.points));
+
       document.getElementById('sdbLiveHourPenalty').textContent = hourPenalty > 0 ? `-${hourPenalty} đ` : '0 đ';
       document.getElementById('sdbLiveHourBonus').textContent = hourBonus > 0 ? `+${hourBonus} đ` : '0 đ';
       document.getElementById('sdbLiveAbsencePenalty').textContent = absencePenalty > 0 ? `-${absencePenalty} đ` : '0 đ';
+      const violPenEl = document.getElementById('sdbLiveViolPenalty');
+      if (violPenEl) violPenEl.textContent = sdbViolPenalty > 0 ? `-${sdbViolPenalty} đ` : '0 đ';
       document.getElementById('sdbLiveAcademicBalance').textContent = (academicBalance >= 0 ? '+' : '') + academicBalance + ' đ';
 
-      const totalImpact = - hourPenalty + hourBonus - absencePenalty + academicBalance;
+      const totalImpact = - hourPenalty + hourBonus - absencePenalty - sdbViolPenalty + academicBalance;
       const impactEl = document.getElementById('sdbLiveTotalImpact');
       if(impactEl) {
           impactEl.textContent = (totalImpact >= 0 ? '+' : '') + totalImpact.toFixed(1) + ' điểm';
@@ -6705,6 +6950,14 @@ function renderAdminSdbOverviewTable() {
     const cpCount = activeAbsences.filter(a => a.type === 'A01').length;
     const kpCount = activeAbsences.filter(a => a.type === 'A02').length;
 
+    let sdbViolMinus = 0;
+    let sdbViolCount = 0;
+    violations.filter(v => {
+      if (v.classId !== c.id || v.status !== 'Đã duyệt' || !isSdbViolationRecord(v) || v.points >= 0) return false;
+      if (fromD && toD) return v.date >= fromD && v.date <= toD;
+      return !v.isArchived;
+    }).forEach(v => { sdbViolMinus += Math.abs(v.points); sdbViolCount++; });
+
     const validGvcn = Math.min((s.gvcnScores || 0), maxGvcn);
     const totalGoodCount = (s.goodScores || 0) + validGvcn;
     const academicBal = (totalGoodCount * goodPt) - ((s.poorScores || 0) * poorPt);
@@ -6718,6 +6971,7 @@ function renderAdminSdbOverviewTable() {
       <td style="text-align:center;">${hourBonus ? '<span class="badge badge-success">+20 đ</span>' : '--'}</td>
       <td style="text-align:center;">${cpCount} có phép / ${kpCount} k.phép</td>
       <td style="text-align:center; color:var(--danger); font-weight:bold;">${absMinus > 0 ? '-' + absMinus : '0'} đ</td>
+      <td style="text-align:center; color:var(--danger); font-weight:bold;">${sdbViolMinus > 0 ? '-' + sdbViolMinus + ' đ (' + sdbViolCount + ')' : '0 đ'}</td>
       <td style="text-align:center;"><span style="color:var(--success); font-weight:600;">+${totalGoodCount}</span> / <span style="color:var(--danger); font-weight:600;">-${s.poorScores || 0}</span></td>
       <td style="text-align:center; font-weight:bold; color:${academicBal >= 0 ? 'var(--success)' : 'var(--danger)'};">${academicBal >= 0 ? '+' : ''}${academicBal} đ</td>
     `;
@@ -6827,14 +7081,18 @@ function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
     return !v.isArchived;
   });
 
-  let codoPenalties = 0, personalBonus = 0, classBonus = 0;
+  let codoPenalties = 0, sdbViolPenalties = 0, personalBonus = 0, classBonus = 0;
 
   approvedViolations.forEach(v => {
     if (v.isClassBonus) {
       classBonus += v.points;
     } else {
       if (v.points < 0) {
-        codoPenalties += Math.abs(v.points);
+        if (isSdbViolationRecord(v)) {
+          sdbViolPenalties += Math.abs(v.points);
+        } else {
+          codoPenalties += Math.abs(v.points);
+        }
       } else {
         personalBonus += v.points;
       }
@@ -6865,7 +7123,7 @@ function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
   const sdbGoodScoreBonus = ((sdb.goodScores || 0) + validGvcn) * goodPt;
   const sdbHourBonus = (sdb.good === sdb.total && sdb.total > 0) ? 20 : 0;
   
-  const totalDeductions = parseFloat((codoPenalties + sdbHourPenalty + sdbPoorScorePenalty + sdbAbsencePenalty).toFixed(1));
+  const totalDeductions = parseFloat((codoPenalties + sdbViolPenalties + sdbHourPenalty + sdbPoorScorePenalty + sdbAbsencePenalty).toFixed(1));
   const totalAdditions = parseFloat((personalBonus + classBonus + sdbGoodScoreBonus + sdbHourBonus).toFixed(1));
   const remainingPenalty = parseFloat((totalDeductions - totalAdditions).toFixed(1));
 
@@ -6886,23 +7144,19 @@ function computeClassScoreItem(c, fromDate, toDate, sdbSourceObj) {
   return {
     id: c.id, grade: c.grade, size: c.size,
     codoPenalties: codoPenalties.toFixed(1),
-    academicPenalties: (sdbHourPenalty + sdbPoorScorePenalty).toFixed(1),
+    academicPenalties: (sdbHourPenalty + sdbPoorScorePenalty + sdbViolPenalties).toFixed(1),
     sdbAbsencePenalty: sdbAbsencePenalty.toFixed(1),
     totalDeductions, totalAdditions, remainingPenalty, rankLabel, bClass
   };
 }
 
-// CHUẨN HÓA ĐIỂM LỚP & SẮP XẾP THUẦN TÚY THEO ĐIỂM (BỎ MỌI TIÊU CHÍ PHỤ, BẰNG ĐIỂM XẾP CÙNG HẠNG)
-function normClassScore(val) {
-  const n = parseFloat(Number(val || 0).toFixed(1));
-  return Object.is(n, -0) ? 0 : n;
-}
-
+// SẮP XẾP THỨ HẠNG: Chỉ xét duy nhất Tổng điểm (remainingPenalty nhỏ nhất = Tổng điểm cao nhất xếp thứ nhất)
 function sortClassScoreList(list) {
   return list.sort((a, b) => {
-    const diff = normClassScore(a.remainingPenalty) - normClassScore(b.remainingPenalty);
-    if (diff !== 0) return diff;
-    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+    if (a.remainingPenalty !== b.remainingPenalty) {
+      return a.remainingPenalty - b.remainingPenalty;
+    }
+    return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
 }
 
@@ -6942,8 +7196,8 @@ function renderLeaderboard() {
   list.forEach((c, idx) => {
     if (idx > 0) {
       const prev = list[idx - 1];
-      // Chỉ so sánh duy nhất Tổng điểm (remainingPenalty): Bằng nhau xếp cùng thứ hạng
-      if (normClassScore(c.remainingPenalty) !== normClassScore(prev.remainingPenalty)) {
+      // Chỉ so sánh duy nhất Tổng điểm (remainingPenalty): Bằng nhau thì giữ nguyên currentRank
+      if (c.remainingPenalty !== prev.remainingPenalty) {
         currentRank = idx + 1;
       }
     }
@@ -6983,19 +7237,12 @@ function renderLeaderboard() {
     tbody.appendChild(tr);
   });
 
-  const formatGradeLeader = (gradeCode) => {
-    const gList = list.filter(l => l.grade === gradeCode);
-    if (gList.length === 0) return '--';
-    const bestScore = normClassScore(gList[0].remainingPenalty);
-    const tiedLeaders = gList.filter(l => normClassScore(l.remainingPenalty) === bestScore);
-    const ptText = bestScore <= 0 ? `Dư +${Math.abs(bestScore)}đ` : `-${bestScore}đ`;
-    if (tiedLeaders.length === 1) return `${tiedLeaders[0].id} (${ptText})`;
-    if (tiedLeaders.length === 2) return `${tiedLeaders[0].id}, ${tiedLeaders[1].id} (${ptText})`;
-    return `${tiedLeaders[0].id} & +${tiedLeaders.length - 1} lớp (${ptText})`;
-  };
-  document.getElementById('topK10').textContent = formatGradeLeader('10');
-  document.getElementById('topK11').textContent = formatGradeLeader('11');
-  document.getElementById('topK12').textContent = formatGradeLeader('12');
+  const k10 = list.find(l => l.grade === '10');
+  const k11 = list.find(l => l.grade === '11');
+  const k12 = list.find(l => l.grade === '12');
+  if (k10) document.getElementById('topK10').textContent = `${k10.id} (${k10.remainingPenalty <= 0 ? 'Dư +' + Math.abs(k10.remainingPenalty) + 'đ' : '-' + k10.remainingPenalty + 'đ'})`;
+  if (k11) document.getElementById('topK11').textContent = `${k11.id} (${k11.remainingPenalty <= 0 ? 'Dư +' + Math.abs(k11.remainingPenalty) + 'đ' : '-' + k11.remainingPenalty + 'đ'})`;
+  if (k12) document.getElementById('topK12').textContent = `${k12.id} (${k12.remainingPenalty <= 0 ? 'Dư +' + Math.abs(k12.remainingPenalty) + 'đ' : '-' + k12.remainingPenalty + 'đ'})`;
 
   const approvedCount = violations.filter(v => {
     if (v.status !== 'Đã duyệt') return false;
@@ -7803,7 +8050,8 @@ function renderCodoLogsTable() {
         loggedUser.role === 'admin' ||
         loggedUser.scope.includes(v.classId)
       ) &&
-      !v.recorder.includes('TNXK');
+      !v.recorder.includes('TNXK') &&
+      !isSdbViolationRecord(v);
     })
     .reverse();
 
@@ -8131,10 +8379,11 @@ function renderCheckinProgressMatrix() {
     // 2. KIỂM TRA SỔ ĐẦU BÀI THEO NGÀY
     const sdb = sdbFullData[c.id] || {};
     
-    // SĐB báo cáo = Có bấm nút lưu trong ngày hôm nay HOẶC có nhập ngày nghỉ trùng hôm nay
+    // SĐB báo cáo = Có bấm nút lưu trong ngày hôm nay HOẶC có nhập ngày nghỉ / lỗi giờ học trùng hôm nay
     const hasAbsencesToday = (sdb.absences || []).some(a => a.date === todayStr);
+    const hasSdbViolToday = violations.some(v => v.classId === c.id && isSdbViolationRecord(v) && v.status !== 'Đã hủy' && v.date === todayStr);
     const isSavedToday = sdb.updatedAt && todayRegex.test(sdb.updatedAt);
-    const sdbReported = isSavedToday || hasAbsencesToday;
+    const sdbReported = isSavedToday || hasAbsencesToday || hasSdbViolToday;
 
     if (sdbReported) sdbDoneCount++;
     else missingSdbClasses.push(c.id);
@@ -8144,6 +8393,7 @@ function renderCheckinProgressMatrix() {
       if (v.classId !== c.id || v.status === 'Đã hủy' || v.points > 0) return false;
       if (v.isClassBonus && v.code !== 'A00') return false; // Lọc bỏ điểm cộng, giữ lại điểm danh (A00)
       if (v.recorder && String(v.recorder).includes('TNXK')) return false;
+      if (isSdbViolationRecord(v)) return false; // Không tính nhầm lỗi giờ học SĐB sang điểm danh Cờ đỏ
       return v.date === todayStr; // Điều kiện cốt lõi: Chỉ lấy của ngày hôm nay
     });
 
@@ -8342,6 +8592,9 @@ function unapproveViolation(id) {
   if (typeof renderHk1SummaryTable === 'function') renderHk1SummaryTable();
   if (loggedUser && loggedUser.role === 'codo') renderCodoLogsTable();
   if (loggedUser && loggedUser.role === 'tnxk') renderTnxkLogsTable();
+  if (typeof renderSdbViolationsTable === 'function') renderSdbViolationsTable();
+  if (typeof recalcSdbFull === 'function') recalcSdbFull();
+  if (typeof renderV5Dashboard === 'function') renderV5Dashboard();
   updatePendingBadge();
 }
 
@@ -8371,6 +8624,8 @@ function editViolationRecord(id) {
       it.code = matchedRule.code;
       it.name = matchedRule.name;
       it.points = matchedRule.point * (it.mult || 1);
+      it.group = matchedRule.group;
+      if (matchedRule.group === 'sdb') it.source = 'sdb';
     } else {
       alert(`⚠️ Không tìm thấy mã [${cleanCode}] trong cấu hình tiêu chí, hệ thống giữ nguyên mã lỗi cũ [${it.code}].`);
     }
@@ -8401,6 +8656,9 @@ function approveViolation(id) {
     renderLeaderboard();
     if (loggedUser.role === 'codo') renderCodoLogsTable();
     if (loggedUser.role === 'tnxk') renderTnxkLogsTable();
+    if (typeof renderSdbViolationsTable === 'function') renderSdbViolationsTable();
+    if (typeof recalcSdbFull === 'function') recalcSdbFull();
+    if (typeof renderV5Dashboard === 'function') renderV5Dashboard();
     updatePendingBadge();
   }
 }
@@ -8432,6 +8690,11 @@ function cancelViolation(id) {
 
       renderReviewTable();
       renderLeaderboard();
+      renderStudentSearchTable();
+      if (typeof renderSdbViolationsTable === 'function') renderSdbViolationsTable();
+      if (typeof recalcSdbFull === 'function') recalcSdbFull();
+      if (typeof renderHk1SummaryTable === 'function') renderHk1SummaryTable();
+      if (typeof renderV5Dashboard === 'function') renderV5Dashboard();
       updatePendingBadge();
     }
   }
@@ -8452,7 +8715,12 @@ function deleteViolationPermanently(id) {
     renderStudentSearchTable();
     if (typeof renderCodoLogsTable === 'function') renderCodoLogsTable();
     if (typeof renderTnxkLogsTable === 'function') renderTnxkLogsTable();
+    if (typeof renderSdbViolationsTable === 'function') renderSdbViolationsTable();
+    if (typeof recalcSdbFull === 'function') recalcSdbFull();
     if (typeof renderBchBonusLogsTable === 'function') renderBchBonusLogsTable();
+    if (typeof renderHk1SummaryTable === 'function') renderHk1SummaryTable();
+    if (typeof renderV5Dashboard === 'function') renderV5Dashboard();
+    if (loggedUser && loggedUser.role === 'admin' && typeof renderAdminSdbOverviewTable === 'function') renderAdminSdbOverviewTable();
     updatePendingBadge();
   }
 }
@@ -8492,7 +8760,7 @@ function renderStudentSearchTable() {
     }
     if (v.points < 0) map[key].minus += Math.abs(v.points);
     else map[key].plus += v.points;
-    map[key].details.push(`[${v.date}] ${v.name} (${v.points > 0 ? '+' : ''}${v.points}đ)`);
+    map[key].details.push(`[${getViolationSourceLabel(v)} ${v.date}] ${v.name} (${v.points > 0 ? '+' : ''}${v.points}đ)`);
   });
 
   Object.keys(sdbFullData).forEach(cid => {
@@ -8812,16 +9080,6 @@ function resetUserPass(idx) {
 }
 
 function saveUserAccountsToStorage() {
-  if (!loggedUser || loggedUser.role !== 'admin') {
-    alert('⛔ Chỉ Admin mới có quyền lưu danh sách tài khoản!');
-    return;
-  }
-  if (!hasVerifiedCloudUsers) {
-    alert('🛡️ ĐÃ CHẶN GHI ĐÈ AN TOÀN!\n\nTrình duyệt này chưa tải xong danh sách mật khẩu thật từ Google Drive (chặn kịp thời để không làm mất mật khẩu các lớp đã đổi).\n\nHệ thống đang tự tải lại danh sách thật ngay bây giờ — vui lòng đợi 3 giây rồi bấm Lưu lại.');
-    fetchDatabaseFromCloud(true);
-    return;
-  }
-
   systemUsers.forEach((u, i) => {
     const uEl = document.getElementById(`usr_uname_${i}`);
     const pEl = document.getElementById(`usr_pass_${i}`);
@@ -8832,7 +9090,7 @@ function saveUserAccountsToStorage() {
     if (uEl && uEl.value.trim()) {
       u.username = uEl.value.trim().toLowerCase().replace(/\s+/g, '_');
     }
-    if (pEl && pEl.value.trim() !== '') u.pass = pEl.value.trim();
+    if (pEl) u.pass = pEl.value.trim();
     if (nEl) u.name = nEl.value.trim();
         
     if (rEl && sEl) {
@@ -8884,8 +9142,6 @@ function saveUserAccountsToStorage() {
     btn.disabled = true;
   }
 
-  localStorage.setItem('yka_last_users_save', Date.now().toString());
-  backupSystemUsersLocally(systemUsers);
   updateUsersLocalAndCloud();
   publishUpdate('UPDATE_ALL_USERS', systemUsers);
   setTimeout(() => {
@@ -8904,10 +9160,10 @@ function saveUserAccountsToStorage() {
 
 function exportLeaderboardCSV() {
   const list = calculateClassScores();
-  let csv = "\uFEFFHạng,Chi đoàn,Khối,Sĩ số,Trừ nề nếp & ATGT,Trừ tiết học & Điểm kém,Trừ nghỉ học,TỔNG ĐIỂM BỊ TRỪ,TỔNG ĐIỂM CỘNG BÙ,ĐIỂM TRỪ CÒN LẠI (SAU BÙ),Xếp loại tập thể\n";
+  let csv = "\uFEFFHạng,Chi đoàn,Khối,Sĩ số,Trừ nề nếp & ATGT,Trừ tiết học - VP Giờ học & Điểm kém (SĐB),Trừ nghỉ học,TỔNG ĐIỂM BỊ TRỪ,TỔNG ĐIỂM CỘNG BÙ,ĐIỂM TRỪ CÒN LẠI (SAU BÙ),Xếp loại tập thể\n";
   let currentRank = 1;
   list.forEach((c, idx) => {
-    if (idx > 0 && normClassScore(c.remainingPenalty) !== normClassScore(list[idx - 1].remainingPenalty)) {
+    if (idx > 0 && c.remainingPenalty !== list[idx - 1].remainingPenalty) {
       currentRank = idx + 1;
     }
     const penStr = c.remainingPenalty <= 0 ? `+${Math.abs(c.remainingPenalty)}` : `-${c.remainingPenalty}`;
@@ -8945,7 +9201,7 @@ function exportStudentViolationsCSV() {
     }
     if (v.points < 0) map[key].minus += Math.abs(v.points);
     else map[key].plus += v.points;
-    map[key].details.push(`[${v.date}] ${v.name} (${v.points > 0 ? '+' : ''}${v.points}đ)`);
+    map[key].details.push(`[${getViolationSourceLabel(v)} ${v.date}] ${v.name} (${v.points > 0 ? '+' : ''}${v.points}đ)`);
   });
 
   Object.keys(sdbFullData).forEach(cid => {
@@ -9265,7 +9521,7 @@ function renderAlerts() {
     if (v.points < 0) {
       map[key].minus += Math.abs(v.points);
       map[key].count++;
-      map[key].details.push(`${v.name} (${v.points}đ)`);
+      map[key].details.push(`[${getViolationSourceLabel(v)}] ${v.name} (${v.points}đ)`);
     }
   });
 
@@ -9770,18 +10026,13 @@ function computeMonthlySummaryRows() {
     let monthRanks = [];
 
     targetMonths.forEach(m => {
-      // Sắp xếp & đồng hạng thuần túy theo Tổng điểm (remainingPenalty), kể cả dữ liệu tháng chốt từ bản cũ
-      const sortedMonthData = [...(m.data || [])].sort((a, b) => {
-        const diff = normClassScore(a.remainingPenalty) - normClassScore(b.remainingPenalty);
-        if (diff !== 0) return diff;
-        return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
-      });
+      // Đồng hạng theo đúng Tổng điểm (remainingPenalty)
       const mDataRanks = {};
       let mCurrentRank = 1;
-      sortedMonthData.forEach((item, i) => {
+      (m.data || []).forEach((item, i) => {
         if (i > 0) {
-          const prev = sortedMonthData[i - 1];
-          if (normClassScore(item.remainingPenalty) !== normClassScore(prev.remainingPenalty)) {
+          const prev = m.data[i - 1];
+          if (item.remainingPenalty !== prev.remainingPenalty) {
             mCurrentRank = i + 1;
           }
         }
@@ -9819,6 +10070,7 @@ function computeMonthlySummaryRows() {
 
   rows.sort((a, b) => {
     if (a.sortWeight !== b.sortWeight) return a.sortWeight - b.sortWeight;
+    if (a.totalMonthlyPenalty !== b.totalMonthlyPenalty) return a.totalMonthlyPenalty - b.totalMonthlyPenalty;
     return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
 
@@ -9851,7 +10103,7 @@ function filterMonthlyViewRows() {
   filtered.forEach((r, idx) => {
     if (idx > 0) {
       const prev = filtered[idx - 1];
-      if (r.sortWeight !== prev.sortWeight) {
+      if (r.sortWeight !== prev.sortWeight || r.totalMonthlyPenalty !== prev.totalMonthlyPenalty) {
         currentRank = idx + 1;
       }
     }
@@ -10008,12 +10260,8 @@ function exportMonthlyViewCSV() {
   const monthHeaderCols = targetMonths.map(m => `Thứ tự ${m.week}`).join(',');
   let csv = `\uFEFFHạng,Chi đoàn,Khối,Sĩ số${monthHeaderCols ? ',' + monthHeaderCols : ''}${show20_11 ? ',Thi đua 20/11' : ''}${show26_3 ? ',Hội trại 26/3' : ''},TỔNG THỨ TỰ,Xếp hạng chung cuộc\n`;
 
-  let currentRank = 1;
   filtered.forEach((r, idx) => {
-    if (idx > 0 && r.sortWeight !== filtered[idx - 1].sortWeight) {
-      currentRank = idx + 1;
-    }
-    const rank = currentRank;
+    const rank = idx + 1;
     const mVals = r.monthRanks.map(m => m.rank || '').join(',');
     csv += `${rank},Chi đoàn ${r.id},${r.grade},${r.size}${mVals ? ',' + mVals : ''}${show20_11 ? ',' + (r.r20_11 || '') : ''}${show26_3 ? ',' + (r.r26_3 || '') : ''},${r.sumRanks || 0},Thứ ${rank}\n`;
   });
@@ -10043,18 +10291,12 @@ function filterHistoryRows() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const sortedHistoryData = [...(currentObj.data || [])].sort((a, b) => {
-    const diff = normClassScore(a.remainingPenalty) - normClassScore(b.remainingPenalty);
-    if (diff !== 0) return diff;
-    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
-  });
-
   let currentRank = 1;
-  sortedHistoryData.forEach((c, idx) => {
+  currentObj.data.forEach((c, idx) => {
     if (idx > 0) {
-      const prev = sortedHistoryData[idx - 1];
-      // Chỉ xét duy nhất Tổng điểm (remainingPenalty): Bằng điểm xếp đồng hạng
-      if (normClassScore(c.remainingPenalty) !== normClassScore(prev.remainingPenalty)) {
+      const prev = currentObj.data[idx - 1];
+      // Chỉ xét bằng Tổng điểm (remainingPenalty) là xếp đồng hạng
+      if (c.remainingPenalty !== prev.remainingPenalty) {
         currentRank = idx + 1;
       }
     }
@@ -10333,9 +10575,10 @@ function aggregateYearOrTermData(weeksList, isFullYear = false) {
 
   // Sắp xếp thuần túy theo Tổng điểm tích lũy (remainingPenalty nhỏ nhất xếp hạng 1)
   return list.sort((a, b) => {
-    const diff = normClassScore(a.remainingPenalty) - normClassScore(b.remainingPenalty);
-    if (diff !== 0) return diff;
-    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+    if (a.remainingPenalty !== b.remainingPenalty) {
+      return a.remainingPenalty - b.remainingPenalty;
+    }
+    return a.id.localeCompare(b.id, undefined, { numeric: true });
   });
 }
 
@@ -10445,14 +10688,9 @@ function exportHistoryCSV() {
   if (!currentObj) return;
 
   let csv = "\uFEFFHạng,Chi đoàn,Khối,Sĩ số,Điểm trừ còn lại (Sau bù),Xếp loại\n";
-  const sortedCsvData = [...(currentObj.data || [])].sort((a, b) => {
-    const diff = normClassScore(a.remainingPenalty) - normClassScore(b.remainingPenalty);
-    if (diff !== 0) return diff;
-    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
-  });
   let currentRank = 1;
-  sortedCsvData.forEach((c, idx) => {
-    if (idx > 0 && normClassScore(c.remainingPenalty) !== normClassScore(sortedCsvData[idx - 1].remainingPenalty)) {
+  (currentObj.data || []).forEach((c, idx) => {
+    if (idx > 0 && c.remainingPenalty !== currentObj.data[idx - 1].remainingPenalty) {
       currentRank = idx + 1;
     }
     const cGrade = c.grade || (c.id.startsWith('10') ? '10' : (c.id.startsWith('11') ? '11' : '12'));
@@ -10537,6 +10775,8 @@ function onInputWeekChange(roleKey) {
   if (roleKey === 'sdb') {
     const dInp = document.getElementById('sdbAbsenceDate');
     if (dInp) dInp.value = defaultDate;
+    const vInp = document.getElementById('sdbViolDate');
+    if (vInp) vInp.value = defaultDate;
     setupSdbForm();
   } else if (roleKey === 'codo') {
     const dInp = document.getElementById('codoDateInput');
@@ -10724,9 +10964,6 @@ function importFullSystemBackup(event) {
       }
       if (Array.isArray(data.users)) {
         systemUsers = data.users;
-        hasVerifiedCloudUsers = true;
-        localStorage.setItem('yka_last_users_save', Date.now().toString());
-        backupSystemUsersLocally(systemUsers);
         localStorage.setItem('yka_system_users_v1', JSON.stringify(systemUsers));
         await syncDataToCloud("db_users.json", systemUsers);
       }
@@ -11334,24 +11571,7 @@ function importFullSystemBackup(event) {
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   };
 
-  // 2. Render Bục Vinh Danh Top 3 Chi đoàn cho Bảng Xếp Hạng Tuần (Đúng đồng hạng theo điểm)
-  function buildPodiumEntries(list) {
-    const normFn = (typeof normClassScore === 'function')
-      ? normClassScore
-      : (v => parseFloat(Number(v || 0).toFixed(1)));
-    let curRank = 1;
-    const top3 = list.slice(0, 3).map((c, idx) => {
-      if (idx > 0 && normFn(c.remainingPenalty) !== normFn(list[idx - 1].remainingPenalty)) {
-        curRank = idx + 1;
-      }
-      return { c, rank: curRank };
-    });
-    const isClassic123 = (top3.length === 3 && top3[0].rank === 1 && top3[1].rank === 2 && top3[2].rank === 3);
-    const rankCounts = {};
-    top3.forEach(e => { rankCounts[e.rank] = (rankCounts[e.rank] || 0) + 1; });
-    return { top3, isClassic123, rankCounts };
-  }
-
+  // 2. Render Bục Vinh Danh Top 3 Chi đoàn cho Bảng Xếp Hạng Tuần
   window.renderV6BoardPodium = function() {
     const host = document.getElementById('v6BoardPodium');
     if (!host || typeof calculateClassScores !== 'function') return;
@@ -11360,24 +11580,21 @@ function importFullSystemBackup(event) {
       host.innerHTML = '';
       return;
     }
-    const { top3, isClassic123, rankCounts } = buildPodiumEntries(list);
-    const styleByRank = {
-      1: { cls: 'v6-podium-1', icon: '🥇', label: 'Hạng 1' },
-      2: { cls: 'v6-podium-2', icon: '🥈', label: 'Hạng 2' },
-      3: { cls: 'v6-podium-3', icon: '🥉', label: 'Hạng 3' }
-    };
-    host.innerHTML = top3.map((entry, idx) => {
-      const c = entry.c;
-      const m = styleByRank[entry.rank] || styleByRank[3];
-      const tieTag = (rankCounts[entry.rank] > 1) ? ' (Đồng hạng)' : '';
-      const orderStyle = isClassic123 ? '' : ` style="order:${idx};"`;
+    const top3 = list.slice(0, 3);
+    const medals = [
+      { cls: 'v6-podium-1', icon: '🥇', label: 'Hạng Nhất' },
+      { cls: 'v6-podium-2', icon: '🥈', label: 'Hạng Nhì' },
+      { cls: 'v6-podium-3', icon: '🥉', label: 'Hạng Ba' }
+    ];
+    host.innerHTML = top3.map((c, idx) => {
+      const m = medals[idx];
       const scoreText = c.remainingPenalty <= 0
         ? ('0 đ (Dư +' + Math.abs(c.remainingPenalty) + 'đ)')
         : ('-' + c.remainingPenalty + ' đ');
       const scoreColor = c.remainingPenalty <= 0 ? '#16a34a' : '#dc2626';
       return `
-        <div class="v6-podium-card ${m.cls}"${orderStyle}>
-          <div class="v6-podium-medal">${m.icon} ${m.label}${tieTag}</div>
+        <div class="v6-podium-card ${m.cls}">
+          <div class="v6-podium-medal">${m.icon} ${m.label}</div>
           <div class="v6-podium-class">Chi đoàn ${c.id}</div>
           <div class="v6-podium-score" style="color:${scoreColor};">${scoreText}</div>
           <div class="v6-podium-meta">Khối ${c.grade} • Sĩ số ${c.size} • <strong>${c.rankLabel || 'Tốt'}</strong></div>
@@ -11386,7 +11603,7 @@ function importFullSystemBackup(event) {
     }).join('');
   };
 
-  // 3. Render Bục Vinh Danh Top 3 Chi đoàn cho Tổng kết Tập thể HK1 / HK2 / Cả năm (Đúng đồng hạng theo điểm)
+  // 3. Render Bục Vinh Danh Top 3 Chi đoàn cho Tổng kết Tập thể HK1 / HK2 / Cả năm
   window.renderV6Hk1ClassPodium = function() {
     const host = document.getElementById('v6Hk1ClassPodium');
     if (!host || typeof calculateHk1ClassScores !== 'function') return;
@@ -11395,29 +11612,22 @@ function importFullSystemBackup(event) {
       host.innerHTML = '';
       return;
     }
-    const { top3, isClassic123, rankCounts } = buildPodiumEntries(list);
-    const styleByRank = {
-      1: { cls: 'v6-podium-1', icon: '🥇', label: 'Hạng 1' },
-      2: { cls: 'v6-podium-2', icon: '🥈', label: 'Hạng 2' },
-      3: { cls: 'v6-podium-3', icon: '🥉', label: 'Hạng 3' }
-    };
-    host.innerHTML = top3.map((entry, idx) => {
-      const c = entry.c;
-      const m = styleByRank[entry.rank] || styleByRank[3];
-      const tieTag = (rankCounts[entry.rank] > 1) ? ' (Đồng hạng)' : '';
-      const orderStyle = isClassic123 ? '' : ` style="order:${idx};"`;
-      const scoreText = c.remainingPenalty <= 0
-        ? ('0 đ (Dư +' + Math.abs(c.remainingPenalty) + 'đ)')
-        : ('-' + c.remainingPenalty + ' đ');
-      const scoreColor = c.remainingPenalty <= 0 ? '#16a34a' : '#dc2626';
+    const top3 = list.slice(0, 3);
+    const medals = [
+      { cls: 'v6-podium-1', icon: '🥇', label: 'Dẫn đầu #1' },
+      { cls: 'v6-podium-2', icon: '🥈', label: 'Hạng Nhì #2' },
+      { cls: 'v6-podium-3', icon: '🥉', label: 'Hạng Ba #3' }
+    ];
+    host.innerHTML = top3.map((c, idx) => {
+      const m = medals[idx];
       const xs = (c.counts && c.counts['Xuất sắc']) || 0;
       const tot = (c.counts && c.counts['Tốt']) || 0;
       return `
-        <div class="v6-podium-card ${m.cls}"${orderStyle}>
-          <div class="v6-podium-medal">${m.icon} ${m.label}${tieTag}</div>
+        <div class="v6-podium-card ${m.cls}">
+          <div class="v6-podium-medal">${m.icon} ${m.label}</div>
           <div class="v6-podium-class">Chi đoàn ${c.id}</div>
-          <div class="v6-podium-score" style="color:${scoreColor};">${scoreText}</div>
-          <div class="v6-podium-meta">${xs} tuần XS • ${tot} tuần Tốt • <strong>${c.termRank || 'Xuất sắc'}</strong></div>
+          <div class="v6-podium-score">${c.termRank || 'Xuất sắc'}</div>
+          <div class="v6-podium-meta">${xs} tuần XS • ${tot} tuần Tốt • Sĩ số ${c.size}</div>
         </div>
       `;
     }).join('');
@@ -11484,10 +11694,6 @@ function importFullSystemBackup(event) {
       syncV6ChipsFromSelect('hk1ClassFilterGrade');
       syncV6ChipsFromSelect('hk1ClassFilterTerm');
       renderV6Hk1ClassPodium();
-    } else if (tabId === 'codo') {
-      if (typeof setupCodoForm === 'function' && typeof loggedUser !== 'undefined' && loggedUser) {
-        setupCodoForm();
-      }
     } else if (tabId === 'review') {
       syncV6ChipsFromSelect('reviewStatusFilter');
     }
